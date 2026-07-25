@@ -14,6 +14,12 @@ export type LogEntry = {
   status?: 'connected' | 'connecting' | 'failed' | 'success' | 'timeout';
   attemptNumber?: number;
   totalAttempts?: number;
+  // Additional detailed fields
+  requestBody?: unknown;
+  responseBody?: unknown;
+  tokenUsage?: { promptTokens?: number; completionTokens?: number; totalTokens?: number };
+  providerSequence?: number;
+  fallbackFrom?: string;
 };
 
 const STORAGE_KEY = 'zhihuErrorLog';
@@ -91,6 +97,12 @@ export const logAiProvider = (
     status?: 'connected' | 'connecting' | 'failed' | 'success' | 'timeout';
     attemptNumber?: number;
     totalAttempts?: number;
+    // Additional detailed fields
+    requestBody?: unknown;
+    responseBody?: unknown;
+    tokenUsage?: { promptTokens?: number; completionTokens?: number; totalTokens?: number };
+    providerSequence?: number;
+    fallbackFrom?: string;
   },
 ) => {
   const entry: LogEntry = {
@@ -106,6 +118,11 @@ export const logAiProvider = (
     status: details?.status,
     attemptNumber: details?.attemptNumber,
     totalAttempts: details?.totalAttempts,
+    requestBody: details?.requestBody,
+    responseBody: details?.responseBody,
+    tokenUsage: details?.tokenUsage,
+    providerSequence: details?.providerSequence,
+    fallbackFrom: details?.fallbackFrom,
   };
   chain = chain.then(() =>
     loadFromStorage().then(() => {

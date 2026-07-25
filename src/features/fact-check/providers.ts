@@ -184,6 +184,8 @@ export const callProvider = async (
     model,
     status: 'connecting',
     attemptNumber: 1,
+    requestBody: { model, max_tokens: config.provider === 'claude' ? 2500 : OPENAI_MAX_TOKENS, messages: [{ role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content: userPrompt }] },
+    providerSequence: 1,
   });
 
   try {
