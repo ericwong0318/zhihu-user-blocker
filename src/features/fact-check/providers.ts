@@ -35,6 +35,8 @@ export type FactCheckConfig = {
   baseUrl?: string;
   // Language the AI reply should be written in.
   language?: FactCheckLanguage;
+  // Per-provider request timeout in seconds. Default: 3600 (1 hour).
+  timeoutSec?: number;
 };
 
 // One failed attempt, recorded so the user can see WHY each provider was skipped.
@@ -197,7 +199,7 @@ export const callProvider = async (
         headers['anthropic-version'] = '2023-06-01';
         body = JSON.stringify({
           model,
-          max_tokens: 1500,
+          max_tokens: 2500,
           system: SYSTEM_PROMPT,
           messages: [{ role: 'user', content: userPrompt }],
         });
@@ -341,6 +343,11 @@ export const callProvider = async (
     const controller = new AbortController();
     const onAbort = () => controller.abort();
     if (signal) signal.addEventListener('abort', onAbort, { once: true });
+
+    // Per-provider timeout (default 180s = 3 minutes)
+    const timeoutMs = (config.timeoutSec ?? 180) * 1000;
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
     let res: Response;
     try {
       if (signal?.aborted) {
@@ -353,10 +360,11 @@ export const callProvider = async (
         signal: controller.signal,
       });
     } catch (err) {
+      clearTimeout(timeoutId);
       if (signal) signal.removeEventListener('abort', onAbort);
       const aborted = controller.signal.aborted;
       const error = aborted
-        ? 'Fact-check request cancelled.'
+        ? 'Fact-check request timed out.'
         : err instanceof Error
           ? err.message
           : String(err);
@@ -371,6 +379,7 @@ export const callProvider = async (
         attempts: [{ provider: config.provider, error }],
       };
     }
+    clearTimeout(timeoutId);
     if (signal) signal.removeEventListener('abort', onAbort);
 
     if (!res.ok) {
