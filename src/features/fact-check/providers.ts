@@ -14,7 +14,7 @@ import {
   FactCheckResult,
   FactCheckLanguage,
 } from './prompt';
-import { logError, logWarn } from '../../features/logging';
+import { logError, logWarn, logAiProvider } from '../../features/logging';
 
 export type ProviderId =
   | 'claude'
@@ -176,6 +176,15 @@ export const callProvider = async (
 
   const userPrompt = buildUserPrompt(text, question, config.language);
   const model = config.model || defaultModel(config.provider);
+  const startTime = Date.now();
+
+  // Log connection attempt
+  logAiProvider('info', `Connecting to AI provider "${config.provider}"`, 'fact-check', {
+    provider: config.provider,
+    model,
+    status: 'connecting',
+    attemptNumber: 1,
+  });
 
   try {
     let url: string;
@@ -368,6 +377,17 @@ export const callProvider = async (
         : err instanceof Error
           ? err.message
           : String(err);
+      const durationMs = Date.now() - startTime;
+      
+      // Log timeout or connection failure
+      logAiProvider('error', `AI provider "${config.provider}" ${aborted ? 'timed out' : 'connection failed'}`, 'fact-check', {
+        provider: config.provider,
+        model,
+        prompt: userPrompt,
+        durationMs,
+        status: aborted ? 'timeout' : 'failed',
+      });
+      
       // Surface connection failures so they are visible in the log.
       logError(
         `Fact-check provider "${config.provider}" request failed`,
@@ -385,6 +405,18 @@ export const callProvider = async (
     if (!res.ok) {
       const detail = await res.text().catch(() => '');
       const error = formatProviderError(res.status, detail);
+      const durationMs = Date.now() - startTime;
+      
+      // Log HTTP error response
+      logAiProvider('error', `AI provider "${config.provider}" returned HTTP ${res.status}`, 'fact-check', {
+        provider: config.provider,
+        model,
+        prompt: userPrompt,
+        response: detail,
+        durationMs,
+        status: 'failed',
+      });
+      
       logWarn(
         `Fact-check provider "${config.provider}" returned an error`,
         error,
@@ -398,9 +430,32 @@ export const callProvider = async (
 
     const data = await res.json();
     const raw = extractText(config.provider, data);
+    const durationMs = Date.now() - startTime;
+    
+    // Log successful response
+    logAiProvider('ai-provider', `AI provider "${config.provider}" completed successfully`, 'fact-check', {
+      provider: config.provider,
+      model,
+      prompt: userPrompt,
+      response: raw,
+      durationMs,
+      status: 'success',
+    });
+    
     return { ok: true, result: parseResult(raw), provider: config.provider };
   } catch (err) {
     const error = err instanceof Error ? err.message : String(err);
+    const durationMs = Date.now() - startTime;
+    
+    // Log error
+    logAiProvider('error', `AI provider "${config.provider}" failed`, 'fact-check', {
+      provider: config.provider,
+      model,
+      prompt: userPrompt,
+      durationMs,
+      status: 'failed',
+    });
+    
     return {
       ok: false,
       error,

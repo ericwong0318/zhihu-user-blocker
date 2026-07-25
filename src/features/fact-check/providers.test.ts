@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { callProvider, callProviders, ProviderId } from './providers';
 
 import { parseResult, SYSTEM_PROMPT } from './prompt';
+import * as logging from '../../features/logging';
 
 // Mock global fetch so we can assert the request shape per provider without
 // hitting the network.
@@ -9,7 +10,12 @@ const fetchMock = vi.fn();
 beforeEach(() => {
   fetchMock.mockReset();
   (global as Record<string, unknown>).fetch = fetchMock as unknown as typeof fetch;
-
+  
+  // Mock the logging functions
+  vi.spyOn(logging, 'logError').mockImplementation(() => {});
+  vi.spyOn(logging, 'logWarn').mockImplementation(() => {});
+  vi.spyOn(logging, 'logInfo').mockImplementation(() => {});
+  vi.spyOn(logging, 'logAiProvider').mockImplementation(() => {});
 });
 
 // Build a successful fetch response whose JSON body is an OpenAI-style

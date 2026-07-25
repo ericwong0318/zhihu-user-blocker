@@ -1,10 +1,19 @@
-export type LogLevel = 'error' | 'warn' | 'info';
+export type LogLevel = 'error' | 'warn' | 'info' | 'ai-provider';
 
 export type LogEntry = {
   time: number;
   level: LogLevel;
   message: string;
   context?: string;
+  // Extended fields for AI provider logging
+  provider?: string;
+  model?: string;
+  prompt?: string;
+  response?: string;
+  durationMs?: number;
+  status?: 'connected' | 'connecting' | 'failed' | 'success' | 'timeout';
+  attemptNumber?: number;
+  totalAttempts?: number;
 };
 
 const STORAGE_KEY = 'zhihuErrorLog';
@@ -64,6 +73,47 @@ export const logWarn = (message: string, context?: string) =>
   add('warn', message, context);
 export const logInfo = (message: string, context?: string) =>
   add('info', message, context);
+
+/**
+ * Log AI provider connection status and interaction details.
+ * Used by fact-check providers to log connection status, prompts, responses, and timing.
+ */
+export const logAiProvider = (
+  level: LogLevel,
+  message: string,
+  context: string,
+  details?: {
+    provider?: string;
+    model?: string;
+    prompt?: string;
+    response?: string;
+    durationMs?: number;
+    status?: 'connected' | 'connecting' | 'failed' | 'success' | 'timeout';
+    attemptNumber?: number;
+    totalAttempts?: number;
+  },
+) => {
+  const entry: LogEntry = {
+    time: Date.now(),
+    level,
+    message,
+    context,
+    provider: details?.provider,
+    model: details?.model,
+    prompt: details?.prompt,
+    response: details?.response,
+    durationMs: details?.durationMs,
+    status: details?.status,
+    attemptNumber: details?.attemptNumber,
+    totalAttempts: details?.totalAttempts,
+  };
+  chain = chain.then(() =>
+    loadFromStorage().then(() => {
+      buffer = [...buffer, entry].slice(-MAX_ENTRIES);
+      persist();
+    }),
+  );
+};
 
 export const getLogs = (): Promise<LogEntry[]> => {
   chain = chain.then(() => loadFromStorage().then(() => buffer));
