@@ -1,5 +1,0 @@
-- [ ] Add factCheckEnabled to chrome.storage.sync in Options.tsx
-- [ ] Add Switch component to Options.tsx for enabling/disabling fact check
-- [ ] Update useFactCheckConfig hook to read factCheckEnabled from storage
-- [ ] Update saveFcConfig to also save factCheckEnabled
-- [ ] Test the build and lint
