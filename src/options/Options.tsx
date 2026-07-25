@@ -12,6 +12,8 @@ import {
   Stack,
   IconButton,
   Divider,
+  Switch,
+  FormControlLabel,
 } from '@mui/material';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
@@ -110,6 +112,8 @@ const Options: React.FC = () => {
   // Per-attempt timeout in seconds (1–120). Each provider attempt is aborted
   // after this long and the next provider is tried as a fallback.
   const [timeoutSec, setTimeoutSec] = useState(9);
+  // Whether fact-check feature is enabled.
+  const [factCheckEnabled, setFactCheckEnabled] = useState(true);
   // Per-provider connection-test status keyed by provider index.
   const [testStatus, setTestStatus] = useState<
     Record<number, 'testing' | 'ok' | 'fail'>
@@ -127,6 +131,7 @@ const Options: React.FC = () => {
           factCheckConfigs: null,
           factCheckConfig: null,
           factCheckTimeoutSec: 9,
+          factCheckEnabled: true,
         },
         (result) => {
           const configs = normalizeFactCheckConfigs(
@@ -139,6 +144,7 @@ const Options: React.FC = () => {
           if (typeof result.factCheckTimeoutSec === 'number') {
             setTimeoutSec(result.factCheckTimeoutSec);
           }
+          setFactCheckEnabled(result.factCheckEnabled as boolean);
         },
       );
     }
@@ -150,7 +156,7 @@ const Options: React.FC = () => {
     const toSave = providers.filter((p) => p.provider);
     const clamped = Math.min(Math.max(Number(timeoutSec) || 9, 1), 120);
     chrome.storage.sync.set(
-      { factCheckConfigs: toSave, factCheckTimeoutSec: clamped },
+      { factCheckConfigs: toSave, factCheckTimeoutSec: clamped, factCheckEnabled },
       () => setFcSaved(true),
     );
   };
@@ -259,6 +265,22 @@ const Options: React.FC = () => {
           is used as a fallback. The API key stays in chrome.storage and is only
           used by the background service worker.
         </Typography>
+
+        <Box sx={{ mt: 2, mb: 2 }}>
+          <FormControlLabel
+            control={
+              <Switch
+                checked={factCheckEnabled}
+                onChange={(e) => {
+                  setFcSaved(false);
+                  setFactCheckEnabled(e.target.checked);
+                }}
+              />
+            }
+            label="Enable Fact Check"
+            labelPlacement="end"
+          />
+        </Box>
 
         <Box sx={{ mt: 2 }}>
           {providers.length === 0 && (

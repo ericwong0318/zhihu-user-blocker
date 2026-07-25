@@ -35,8 +35,8 @@ describe('useFactCheckConfig', () => {
   });
 
   it('should initialize with default values', async () => {
-    global.chrome.storage.sync.get.mockImplementation((_defaults: unknown, callback: (items: { factCheckConfigs: unknown; factCheckConfig: unknown; factCheckTimeoutSec: number }) => void) => {
-      callback({ factCheckConfigs: null, factCheckConfig: null, factCheckTimeoutSec: 9 });
+    global.chrome.storage.sync.get.mockImplementation((_defaults: unknown, callback: (items: { factCheckConfigs: unknown; factCheckConfig: unknown; factCheckTimeoutSec: number; factCheckEnabled: boolean }) => void) => {
+      callback({ factCheckConfigs: null, factCheckConfig: null, factCheckTimeoutSec: 9, factCheckEnabled: false });
     });
     global.chrome.storage.onChanged.addListener.mockImplementation(() => {});
 
@@ -57,11 +57,12 @@ describe('useFactCheckConfig', () => {
     
     (normalizeFactCheckConfigs as unknown as ReturnType<typeof vi.fn>).mockReturnValue(mockConfigs);
     
-    global.chrome.storage.sync.get.mockImplementation((_defaults: unknown, callback: (items: { factCheckConfigs: typeof mockConfigs; factCheckConfig: unknown; factCheckTimeoutSec: number }) => void) => {
+    global.chrome.storage.sync.get.mockImplementation((_defaults: unknown, callback: (items: { factCheckConfigs: typeof mockConfigs; factCheckConfig: unknown; factCheckTimeoutSec: number; factCheckEnabled: boolean }) => void) => {
       callback({ 
         factCheckConfigs: mockConfigs, 
         factCheckConfig: null, 
-        factCheckTimeoutSec: 15 
+        factCheckTimeoutSec: 15,
+        factCheckEnabled: true,
       });
     });
     global.chrome.storage.onChanged.addListener.mockImplementation(() => {});
@@ -80,11 +81,12 @@ describe('useFactCheckConfig', () => {
     
     (normalizeFactCheckConfigs as unknown as ReturnType<typeof vi.fn>).mockReturnValue(mockConfigs);
     
-    global.chrome.storage.sync.get.mockImplementation((_defaults: unknown, callback: (items: { factCheckConfigs: typeof mockConfigs; factCheckConfig: unknown; factCheckTimeoutSec: number | undefined }) => void) => {
+    global.chrome.storage.sync.get.mockImplementation((_defaults: unknown, callback: (items: { factCheckConfigs: typeof mockConfigs; factCheckConfig: unknown; factCheckTimeoutSec: number | undefined; factCheckEnabled: boolean }) => void) => {
       callback({ 
         factCheckConfigs: mockConfigs, 
         factCheckConfig: null, 
-        factCheckTimeoutSec: undefined 
+        factCheckTimeoutSec: undefined,
+        factCheckEnabled: true,
       });
     });
     global.chrome.storage.onChanged.addListener.mockImplementation(() => {});
@@ -100,8 +102,8 @@ describe('useFactCheckConfig', () => {
 
   it('should listen for storage changes', async () => {
     // Initial load returns empty config
-    global.chrome.storage.sync.get.mockImplementation((_defaults: unknown, callback: (items: { factCheckConfigs: unknown; factCheckConfig: unknown; factCheckTimeoutSec: number }) => void) => {
-      callback({ factCheckConfigs: null, factCheckConfig: null, factCheckTimeoutSec: 9 });
+    global.chrome.storage.sync.get.mockImplementation((_defaults: unknown, callback: (items: { factCheckConfigs: unknown; factCheckConfig: unknown; factCheckTimeoutSec: number; factCheckEnabled: boolean }) => void) => {
+      callback({ factCheckConfigs: null, factCheckConfig: null, factCheckTimeoutSec: 9, factCheckEnabled: false });
     });
     
     let changeListener: (changes: Record<string, { oldValue: unknown; newValue: unknown }>, area: string) => void;
@@ -120,11 +122,12 @@ describe('useFactCheckConfig', () => {
     // which reads from storage again. So we need to update the mock to return new values
     await act(async () => {
       // Update the mock for when load() is called again
-      global.chrome.storage.sync.get.mockImplementation((_defaults: unknown, callback: (items: { factCheckConfigs: Array<{ provider: string; apiKey: string; language: string }>; factCheckConfig: unknown; factCheckTimeoutSec: number }) => void) => {
+      global.chrome.storage.sync.get.mockImplementation((_defaults: unknown, callback: (items: { factCheckConfigs: Array<{ provider: string; apiKey: string; language: string }>; factCheckConfig: unknown; factCheckTimeoutSec: number; factCheckEnabled: boolean }) => void) => {
         callback({ 
           factCheckConfigs: [{ provider: 'openai', apiKey: 'newkey', language: 'zh-CN' }], 
           factCheckConfig: null, 
-          factCheckTimeoutSec: 20 
+          factCheckTimeoutSec: 20,
+          factCheckEnabled: true,
         });
       });
       (normalizeFactCheckConfigs as unknown as ReturnType<typeof vi.fn>).mockReturnValue([
@@ -137,6 +140,7 @@ describe('useFactCheckConfig', () => {
             newValue: [{ provider: 'openai', apiKey: 'newkey', language: 'zh-CN' }] 
           },
           factCheckTimeoutSec: { oldValue: 9, newValue: 20 },
+          factCheckEnabled: { oldValue: false, newValue: true },
         }, 'sync');
       }
     });
@@ -246,11 +250,12 @@ describe('useFactCheckConfig', () => {
     
     (normalizeFactCheckConfigs as unknown as ReturnType<typeof vi.fn>).mockReturnValue([mockConfig]);
     
-    global.chrome.storage.sync.get.mockImplementation((_defaults: unknown, callback: (items: { factCheckConfigs: unknown; factCheckConfig: typeof mockConfig; factCheckTimeoutSec: number }) => void) => {
+    global.chrome.storage.sync.get.mockImplementation((_defaults: unknown, callback: (items: { factCheckConfigs: unknown; factCheckConfig: typeof mockConfig; factCheckTimeoutSec: number; factCheckEnabled: boolean }) => void) => {
       callback({ 
         factCheckConfigs: null, 
         factCheckConfig: mockConfig, 
-        factCheckTimeoutSec: 9 
+        factCheckTimeoutSec: 9,
+        factCheckEnabled: true,
       });
     });
     global.chrome.storage.onChanged.addListener.mockImplementation(() => {});

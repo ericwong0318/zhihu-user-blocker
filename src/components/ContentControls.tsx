@@ -12,7 +12,7 @@ import { useZhihuContent } from '../hooks/useZhihuContent';
 export const ContentControls: React.FC = () => {
   const { blocked, users, blockContainers, blockUser, unblockUser } = useBlockUser();
   const { contents } = useZhihuContent();
-  const { factCheckEnabled, language } = useFactCheckConfig();
+  const { factCheckEnabled, hasProviders, language } = useFactCheckConfig();
   const runFactCheck = useFactCheckRunner(language);
   const fcContainers = useFactCheckContainers(contents);
 
@@ -58,12 +58,14 @@ export const ContentControls: React.FC = () => {
                 onBlock={() => user && blockUser(user.id, user.name)}
                 onUnblock={() => user && unblockUser(user.id)}
               />
-              <FactCheckButton
-                enabled={factCheckEnabled}
-                text={content.text}
-                question={content.question}
-                onFactCheck={runFactCheck}
-              />
+              {factCheckEnabled && (
+                <FactCheckButton
+                  enabled={hasProviders}
+                  text={content.text}
+                  question={content.question}
+                  onFactCheck={runFactCheck}
+                />
+              )}
             </Box>,
             container
           );

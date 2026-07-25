@@ -136,6 +136,21 @@ describe('Blocker (unit)', () => {
   });
 
   it('injects a Fact Check button next to the Block button', async () => {
+    // Set up storage with factCheckEnabled: true and providers configured
+    await mockChromeStorage.sync.set({
+      factCheckConfigs: [
+        {
+          provider: 'openai',
+          apiKey: 'test-key',
+          model: 'gpt-4o-mini',
+          language: 'en',
+        },
+      ],
+      factCheckConfig: null,
+      factCheckEnabled: true,
+      factCheckTimeoutSec: 9,
+    });
+
     const { listItem, link, rich } = seedAnswerDom();
     render(<ContentControls />);
     const factCheckBtn = await waitFor(() => {
@@ -164,9 +179,12 @@ describe('Blocker (unit)', () => {
   it('re-enables Fact Check when provider config is added via storage change', async () => {
     seedAnswerDom();
 
+    // Initially: factCheckEnabled true but no providers
     await mockChromeStorage.sync.set({
       factCheckConfigs: null,
       factCheckConfig: null,
+      factCheckEnabled: true,
+      factCheckTimeoutSec: 9,
     });
 
     render(<ContentControls />);
@@ -198,6 +216,22 @@ describe('Blocker (unit)', () => {
     // A collapsed Zhihu answer often matches several CONTENT_SELECTORS
     // (.ContentItem-title, .RichText, .AnswerCard) that all belong to the same
     // answer. We must not create one button per match.
+    
+    // Set up storage with factCheckEnabled: true and providers configured
+    await mockChromeStorage.sync.set({
+      factCheckConfigs: [
+        {
+          provider: 'openai',
+          apiKey: 'test-key',
+          model: 'gpt-4o-mini',
+          language: 'en',
+        },
+      ],
+      factCheckConfig: null,
+      factCheckEnabled: true,
+      factCheckTimeoutSec: 9,
+    });
+
     document.body.innerHTML = '';
     const listItem = document.createElement('div');
     listItem.className = 'List-item ContentItem';
