@@ -207,18 +207,24 @@ const Options: React.FC = () => {
     setTestStatus((s) => ({ ...s, [idx]: 'testing' }));
     setTestMsg((m) => ({ ...m, [idx]: '' }));
     try {
-      const res = await callProvider(
-        'Connection test.',
-        undefined,
-        cfg as FactCheckConfig,
-        9000,
-      );
-      if (res.ok) {
-        setTestStatus((s) => ({ ...s, [idx]: 'ok' }));
-        setTestMsg((m) => ({ ...m, [idx]: 'Connected successfully.' }));
-      } else {
-        setTestStatus((s) => ({ ...s, [idx]: 'fail' }));
-        setTestMsg((m) => ({ ...m, [idx]: res.error }));
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 9000);
+      try {
+        const res = await callProvider(
+          'Connection test.',
+          undefined,
+          cfg as FactCheckConfig,
+          controller.signal,
+        );
+        if (res.ok) {
+          setTestStatus((s) => ({ ...s, [idx]: 'ok' }));
+          setTestMsg((m) => ({ ...m, [idx]: 'Connected successfully.' }));
+        } else {
+          setTestStatus((s) => ({ ...s, [idx]: 'fail' }));
+          setTestMsg((m) => ({ ...m, [idx]: res.error }));
+        }
+      } finally {
+        clearTimeout(timeout);
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
