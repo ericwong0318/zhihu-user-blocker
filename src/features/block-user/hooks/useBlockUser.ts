@@ -107,6 +107,16 @@ export const useBlockUser = () => {
     setBlockContainers(next);
   }, [users]);
 
+  // Hide content for blocked users when blocked list changes
+  useEffect(() => {
+    blocked.forEach((blockedUser) => {
+      const user = users.find((u) => u.id === blockedUser.id);
+      if (user) {
+        setUserContentHidden(user, true);
+      }
+    });
+  }, [blocked, users]);
+
   const blockUser = (id: string, name: string) => {
     if (blocked.some((u) => u.id === id)) return;
     const updated = [...blocked, { id, name }];

@@ -265,6 +265,49 @@ describe('useBlockUser', () => {
 
       document.body.removeChild(mockContent);
     });
+
+    it('should hide content for blocked users loaded from storage', async () => {
+      const mockBlockedUsers: BlockedUser[] = [
+        { id: 'https://www.zhihu.com/people/blockeduser', name: 'Blocked User' },
+      ];
+      
+      global.chrome.storage.sync.get.mockImplementation((_defaults: unknown, callback: (items: { zhihuBlockedUsers: BlockedUser[] }) => void) => {
+        callback({ zhihuBlockedUsers: mockBlockedUsers });
+      });
+      global.chrome.storage.onChanged.addListener.mockImplementation(() => {});
+
+      const { result } = renderHook(() => useBlockUser());
+      
+      await waitFor(() => {
+        expect(result.current.blocked).toEqual(mockBlockedUsers);
+      });
+
+      // Set up DOM with the blocked user's content
+      const parent = document.createElement('div');
+      parent.setAttribute('data-za-detail-view-path', 'UserProfile');
+      
+      const mockAuthorLink = document.createElement('a');
+      mockAuthorLink.className = 'UserLink-link';
+      mockAuthorLink.href = 'https://www.zhihu.com/people/blockeduser';
+      mockAuthorLink.textContent = 'Blocked User';
+      
+      parent.appendChild(mockAuthorLink);
+      
+      const mockContent = document.createElement('div');
+      mockContent.className = 'ContentItem';
+      mockContent.appendChild(parent);
+      document.body.appendChild(mockContent);
+
+      // Wait for scan effect and the hide-content effect to run
+      await act(async () => {
+        await new Promise(resolve => setTimeout(resolve, 300));
+      });
+
+      // The blocked user's content should be hidden
+      expect(mockContent.style.display).toBe('none');
+
+      document.body.removeChild(mockContent);
+    });
   });
 
   describe('getZhihuUsers', () => {
