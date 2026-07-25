@@ -21,25 +21,27 @@ describe('FactCheck UI', () => {
     vi.useRealTimers();
   });
 
-  it('shows loading state, stage updates, and renders a final result', async () => {
+  it('shows streaming AI thinking text and renders a final result', async () => {
     await mockChromeStorage.sync.set({
       factCheckConfigs: [
         {
-          provider: 'OpenAI',
+          provider: 'openai',
           apiKey: 'fake',
           model: 'gpt-4o-mini',
           language: 'en',
         },
       ],
-      factCheckTimeoutSec: 9,
     });
 
     const onFactCheck = vi.fn(
       (text: string, onStage?: (stage: string, isRetry?: boolean) => void) => {
         return new Promise((resolve) => {
           window.setTimeout(() => {
-            onStage?.('Contacting AI provider…', false);
+            onStage?.('Parsing text…', false);
           }, 50);
+          window.setTimeout(() => {
+            onStage?.('Running logic analysis…', false);
+          }, 100);
           window.setTimeout(
             () =>
               resolve({
@@ -49,7 +51,7 @@ describe('FactCheck UI', () => {
                 verdict: 'credible',
                 provider: 'OpenAI',
               }),
-            300,
+            2000,
           );
         });
       },
@@ -63,25 +65,33 @@ describe('FactCheck UI', () => {
       />,
     );
 
+    // Flush the useEffect that reads provider config from storage so
+    // providerInfo is populated before we click.
+    await act(async () => {});
+
     const button = screen.getByRole('button', { name: /fact check/i });
     fireEvent.click(button);
 
+    // Loading header appears
     await waitFor(() =>
-      expect(screen.getByRole('progressbar')).toBeInTheDocument(),
+      expect(screen.getByText(/AI is thinking/i)).toBeInTheDocument(),
     );
 
-    const progress = screen.getByRole('progressbar');
-    expect(progress).toHaveAttribute('aria-valuenow');
+    // Pipeline stages should appear in the thinking text area
+    await waitFor(() => {
+      // Check that thinking text area contains the stages
+      const thinkingContainer = screen.getByText(/Parsing text/i).closest('div');
+      expect(thinkingContainer).toBeInTheDocument();
+      expect(screen.getByText(/Parsing text/i)).toBeInTheDocument();
+      expect(screen.getByText(/Running logic analysis/i)).toBeInTheDocument();
+      expect(screen.getByText(/Analyzing bias/i)).toBeInTheDocument();
+      expect(screen.getByText(/Synthesizing verdict/i)).toBeInTheDocument();
+    });
 
-    await waitFor(() =>
-      expect(Number(progress.getAttribute('aria-valuenow'))).toBeGreaterThan(0),
-    );
-    await waitFor(() =>
-      expect(screen.getByText(/Contacting/i)).toBeInTheDocument(),
-    );
+    // Final result renders
     await waitFor(
       () => expect(screen.getByText(/Credible/i)).toBeInTheDocument(),
-      { timeout: 1000 },
+      { timeout: 3000 },
     );
     expect(screen.getByText(/via OpenAI/i)).toBeInTheDocument();
     expect(onFactCheck).toHaveBeenCalledWith(
@@ -90,17 +100,16 @@ describe('FactCheck UI', () => {
     );
   });
 
-  it('resets progress and shows retry stage when the provider callback reports a retry', async () => {
+  it('shows retry indicator when the provider callback reports a retry', async () => {
     await mockChromeStorage.sync.set({
       factCheckConfigs: [
         {
-          provider: 'OpenAI',
+          provider: 'openai',
           apiKey: 'fake',
           model: 'gpt-4o-mini',
           language: 'en',
         },
       ],
-      factCheckTimeoutSec: 9,
     });
 
     let stageCallback: ((stage: string, isRetry?: boolean) => void) | undefined;
@@ -120,7 +129,7 @@ describe('FactCheck UI', () => {
                 verdict: 'misleading',
                 provider: 'OpenAI',
               }),
-            400,
+            2000,
           );
         });
       },
@@ -134,14 +143,11 @@ describe('FactCheck UI', () => {
       />,
     );
 
+    await act(async () => {});
+
     fireEvent.click(screen.getByRole('button', { name: /fact check/i }));
     await waitFor(() =>
-      expect(screen.getByRole('progressbar')).toBeInTheDocument(),
-    );
-
-    const progress = screen.getByRole('progressbar');
-    await waitFor(() =>
-      expect(Number(progress.getAttribute('aria-valuenow'))).toBeGreaterThan(0),
+      expect(screen.getByText(/AI is thinking/i)).toBeInTheDocument(),
     );
 
     expect(stageCallback).toBeDefined();
@@ -149,14 +155,12 @@ describe('FactCheck UI', () => {
       stageCallback?.('Contacting AI provider…', true);
     });
 
-    expect(
-      await screen.findByText(/Retrying with another provider…/i),
-    ).toBeInTheDocument();
-    expect(Number(progress.getAttribute('aria-valuenow'))).toBe(0);
+    // The retry indicator appears in the thinking text
+    expect(await screen.findByText(/Retrying/i)).toBeInTheDocument();
 
     await waitFor(
       () => expect(screen.getByText(/Misleading/i)).toBeInTheDocument(),
-      { timeout: 1000 },
+      { timeout: 3000 },
     );
   });
 });

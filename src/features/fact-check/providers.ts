@@ -84,12 +84,6 @@ const isLocalUrl = (baseUrl: string): boolean => {
   }
 };
 
-// Each individual provider attempt is capped at this many ms by default. If a
-// provider is slow or hangs, the call aborts so we can fall back to the next
-// provider and the UI "recounts" its progress bar for the new attempt. The
-// value can be overridden per request from the Options page (timeout seconds).
-const DEFAULT_PROVIDER_TIMEOUT_MS = 9000;
-
 // Output token budget for OpenAI-compatible providers. Caps response length
 // (not thinking time) and helps avoid runaway generation. Claude already sets
 // max_tokens: 1500 in its own branch.
@@ -160,15 +154,14 @@ const extractText = (provider: ProviderId, data: unknown): string => {
   );
 };
 
-
 // Call a SINGLE provider. Returns ok:false (never throws) so callProviders can
-// decide whether to fall back. `timeoutMs` caps this single attempt; on abort
-// we fall back to the next provider.
+// decide whether to fall back. The request is not time-limited — the AI provider
+// may take as long as it needs. The AbortController is only used for external
+// cancellation (e.g. when the user closes the popover or the port disconnects).
 export const callProvider = async (
   text: string,
   question: string | undefined,
   config: FactCheckConfig,
-  timeoutMs: number = DEFAULT_PROVIDER_TIMEOUT_MS,
   signal?: AbortSignal,
 ): Promise<FactCheckResponse> => {
   if (!config || !config.provider) {
@@ -331,13 +324,9 @@ export const callProvider = async (
         );
         url = `${base}/chat/completions`;
         headers.Authorization = `Bearer ${config.apiKey}`;
-        // `timeout` is a non-standard OpenRouter field (seconds) that asks the
-        // upstream to abort after this long. Best-effort only — the client-side
-        // AbortController below remains the real guarantee.
         body = JSON.stringify({
           model,
           max_tokens: OPENAI_MAX_TOKENS,
-          timeout: Math.round(timeoutMs / 1000),
           messages: [
             { role: 'system', content: SYSTEM_PROMPT },
             { role: 'user', content: userPrompt },
@@ -350,7 +339,6 @@ export const callProvider = async (
     }
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), timeoutMs);
     const onAbort = () => controller.abort();
     if (signal) signal.addEventListener('abort', onAbort, { once: true });
     let res: Response;
@@ -365,17 +353,14 @@ export const callProvider = async (
         signal: controller.signal,
       });
     } catch (err) {
-      clearTimeout(timeout);
       if (signal) signal.removeEventListener('abort', onAbort);
       const aborted = controller.signal.aborted;
       const error = aborted
-        ? signal?.aborted
-          ? 'Fact-check request cancelled.'
-          : `Provider timed out after ${timeoutMs / 1000}s.`
+        ? 'Fact-check request cancelled.'
         : err instanceof Error
           ? err.message
           : String(err);
-      // Surface connection failures / timeouts so they are visible in the log.
+      // Surface connection failures so they are visible in the log.
       logError(
         `Fact-check provider "${config.provider}" request failed`,
         error,
@@ -386,7 +371,6 @@ export const callProvider = async (
         attempts: [{ provider: config.provider, error }],
       };
     }
-    clearTimeout(timeout);
     if (signal) signal.removeEventListener('abort', onAbort);
 
     if (!res.ok) {
@@ -421,8 +405,7 @@ export const callProvider = async (
 // listing every failed attempt if all providers fail.
 /**
  * Report the current provider attempt to the UI. `isRetry` is true when this is
- * a fallback attempt after a previous provider failed, so the UI can recount
- * its progress bar.
+ * a fallback attempt after a previous provider failed.
  */
 type StageReporter = (stage: string, isRetry: boolean) => void;
 
@@ -431,7 +414,6 @@ export const callProviders = async (
   question: string | undefined,
   configs: FactCheckConfig[],
   onStage?: StageReporter,
-  timeoutMs: number = DEFAULT_PROVIDER_TIMEOUT_MS,
   signal?: AbortSignal,
 ): Promise<FactCheckResponse> => {
   const attempts: ProviderAttempt[] = [];
@@ -444,7 +426,7 @@ export const callProviders = async (
     if (!cfg || !cfg.provider) continue;
     const model = cfg.model ? ` (${cfg.model})` : '';
     onStage?.(`Contacting ${cfg.provider}${model}…`, isRetry);
-    const res = await callProvider(text, question, cfg, timeoutMs, signal);
+    const res = await callProvider(text, question, cfg, signal);
     if (signal?.aborted) {
       return res.ok
         ? res
@@ -456,7 +438,7 @@ export const callProviders = async (
     }
     if (res.ok) return res;
     attempts.push(...res.attempts);
-    // Announce the fallback so the UI can show the next provider + recount.
+    // Announce the fallback so the UI can show the next provider.
     onStage?.(`${cfg.provider} failed — trying next provider…`, true);
     isRetry = true;
   }

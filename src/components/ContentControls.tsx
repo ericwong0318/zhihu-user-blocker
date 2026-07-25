@@ -12,8 +12,8 @@ import { useZhihuContent } from '../hooks/useZhihuContent';
 export const ContentControls: React.FC = () => {
   const { blocked, users, blockContainers, blockUser, unblockUser } = useBlockUser();
   const { contents } = useZhihuContent();
-  const { factCheckEnabled, language, timeoutSec } = useFactCheckConfig();
-  const runFactCheck = useFactCheckRunner(language, timeoutSec);
+  const { factCheckEnabled, language } = useFactCheckConfig();
+  const runFactCheck = useFactCheckRunner(language);
   const fcContainers = useFactCheckContainers(contents);
 
   return (

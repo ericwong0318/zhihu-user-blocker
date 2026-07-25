@@ -6,7 +6,7 @@ describe('useFactCheckRunner', () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
-    
+
     // Mock chrome.runtime
     global.chrome = {
       runtime: {
@@ -23,9 +23,9 @@ describe('useFactCheckRunner', () => {
   describe('runFactCheck', () => {
     it('should return error when chrome.runtime.connect is not available', async () => {
       delete (global.chrome as { runtime?: { connect?: unknown } }).runtime?.connect;
-      
+
       const result = await runFactCheck('test text', 'en', 9);
-      
+
       expect(result).toEqual({ error: 'Extension unavailable.' });
     });
 
@@ -36,23 +36,23 @@ describe('useFactCheckRunner', () => {
         postMessage: vi.fn(),
         disconnect: vi.fn(),
       };
-      
+
       global.chrome.runtime.connect.mockReturnValue(mockPort);
       global.chrome.runtime.lastError = null;
 
       let messageHandler: ((msg: unknown) => void) | undefined;
-      
+
       mockPort.onMessage.addListener.mockImplementation((handler) => {
         messageHandler = handler;
       });
-      
+
       mockPort.onDisconnect.addListener.mockImplementation(() => {});
 
       const promise = runFactCheck('test text', undefined, 'zh-CN', 30);
-      
+
       // Verify port was created with correct name
       expect(global.chrome.runtime.connect).toHaveBeenCalledWith({ name: 'factCheck' });
-      
+
       // Verify message was posted
       expect(mockPort.postMessage).toHaveBeenCalledWith({
         text: 'test text',
@@ -77,20 +77,20 @@ describe('useFactCheckRunner', () => {
         postMessage: vi.fn(),
         disconnect: vi.fn(),
       };
-      
+
       global.chrome.runtime.connect.mockReturnValue(mockPort);
       global.chrome.runtime.lastError = null;
 
       let messageHandler: ((msg: unknown) => void) | undefined;
-      
+
       mockPort.onMessage.addListener.mockImplementation((handler) => {
         messageHandler = handler;
       });
-      
+
       mockPort.onDisconnect.addListener.mockImplementation(() => {});
 
       const promise = runFactCheck('test text', undefined, 'en', 9);
-      
+
       // Simulate error response
       act(() => {
         messageHandler?.({ error: 'Provider failed' });
@@ -107,20 +107,20 @@ describe('useFactCheckRunner', () => {
         postMessage: vi.fn(),
         disconnect: vi.fn(),
       };
-      
+
       global.chrome.runtime.connect.mockReturnValue(mockPort);
       global.chrome.runtime.lastError = null;
 
       let messageHandler: ((msg: unknown) => void) | undefined;
-      
+
       mockPort.onMessage.addListener.mockImplementation((handler) => {
         messageHandler = handler;
       });
-      
+
       mockPort.onDisconnect.addListener.mockImplementation(() => {});
 
       const promise = runFactCheck('test text', undefined, 'en', 9);
-      
+
       // Simulate disabled response
       act(() => {
         messageHandler?.({ disabled: true });
@@ -130,31 +130,34 @@ describe('useFactCheckRunner', () => {
       expect(result).toEqual({ error: 'No provider configured.' });
     });
 
-    it('should handle stage messages (ignored)', async () => {
+    it('should stream stage messages to onStage callback', async () => {
       const mockPort = {
         onMessage: { addListener: vi.fn() },
         onDisconnect: { addListener: vi.fn() },
         postMessage: vi.fn(),
         disconnect: vi.fn(),
       };
-      
+
       global.chrome.runtime.connect.mockReturnValue(mockPort);
       global.chrome.runtime.lastError = null;
 
       let messageHandler: ((msg: unknown) => void) | undefined;
-      
+
       mockPort.onMessage.addListener.mockImplementation((handler) => {
         messageHandler = handler;
       });
-      
+
       mockPort.onDisconnect.addListener.mockImplementation(() => {});
 
-      const promise = runFactCheck('test text', undefined, 'en', 9);
-      
-      // Simulate stage message (should be ignored)
+      const onStage = vi.fn();
+      const promise = runFactCheck('test text', undefined, 'en', 9, onStage);
+
+      // Simulate stage message — should be streamed to onStage, not ignored
       act(() => {
         messageHandler?.({ stage: 'Contacting provider...' });
       });
+
+      expect(onStage).toHaveBeenCalledWith('Contacting provider...', false);
 
       // Should not resolve yet, need a result
       // Simulate final result
@@ -166,6 +169,44 @@ describe('useFactCheckRunner', () => {
       expect(result).toEqual({ result: { verdict: 'unverified' } });
     });
 
+    it('should stream stage messages with isRetry flag to onStage callback', async () => {
+      const mockPort = {
+        onMessage: { addListener: vi.fn() },
+        onDisconnect: { addListener: vi.fn() },
+        postMessage: vi.fn(),
+        disconnect: vi.fn(),
+      };
+
+      global.chrome.runtime.connect.mockReturnValue(mockPort);
+      global.chrome.runtime.lastError = null;
+
+      let messageHandler: ((msg: unknown) => void) | undefined;
+
+      mockPort.onMessage.addListener.mockImplementation((handler) => {
+        messageHandler = handler;
+      });
+
+      mockPort.onDisconnect.addListener.mockImplementation(() => {});
+
+      const onStage = vi.fn();
+      const promise = runFactCheck('test text', undefined, 'en', 9, onStage);
+
+      // Simulate retry stage message
+      act(() => {
+        messageHandler?.({ stage: 'Trying next provider...', isRetry: true });
+      });
+
+      expect(onStage).toHaveBeenCalledWith('Trying next provider...', true);
+
+      // Simulate final result
+      act(() => {
+        messageHandler?.({ result: { verdict: 'credible' } });
+      });
+
+      const result = await promise;
+      expect(result).toEqual({ result: { verdict: 'credible' } });
+    });
+
     it('should handle port disconnect with error', async () => {
       const mockPort = {
         onMessage: { addListener: vi.fn() },
@@ -173,20 +214,20 @@ describe('useFactCheckRunner', () => {
         postMessage: vi.fn(),
         disconnect: vi.fn(),
       };
-      
+
       global.chrome.runtime.connect.mockReturnValue(mockPort);
       global.chrome.runtime.lastError = { message: 'Connection failed' };
 
       let disconnectHandler: (() => void) | undefined;
-      
+
       mockPort.onMessage.addListener.mockImplementation(() => {});
-      
+
       mockPort.onDisconnect.addListener.mockImplementation((handler) => {
         disconnectHandler = handler;
       });
 
       const promise = runFactCheck('test text', undefined, 'en', 9);
-      
+
       // Simulate disconnect
       act(() => {
         disconnectHandler?.();
@@ -203,20 +244,20 @@ describe('useFactCheckRunner', () => {
         postMessage: vi.fn(),
         disconnect: vi.fn(),
       };
-      
+
       global.chrome.runtime.connect.mockReturnValue(mockPort);
       global.chrome.runtime.lastError = null;
 
       let disconnectHandler: (() => void) | undefined;
-      
+
       mockPort.onMessage.addListener.mockImplementation(() => {});
-      
+
       mockPort.onDisconnect.addListener.mockImplementation((handler) => {
         disconnectHandler = handler;
       });
 
       const promise = runFactCheck('test text', undefined, 'en', 9);
-      
+
       // Simulate disconnect without error
       act(() => {
         disconnectHandler?.();
@@ -233,20 +274,20 @@ describe('useFactCheckRunner', () => {
         postMessage: vi.fn(),
         disconnect: vi.fn(),
       };
-      
+
       global.chrome.runtime.connect.mockReturnValue(mockPort);
       global.chrome.runtime.lastError = null;
 
       let messageHandler: ((msg: unknown) => void) | undefined;
-      
+
       mockPort.onMessage.addListener.mockImplementation((handler) => {
         messageHandler = handler;
       });
-      
+
       mockPort.onDisconnect.addListener.mockImplementation(() => {});
 
       const promise = runFactCheck('test text', undefined, 'en', 9);
-      
+
       // Simulate null message
       act(() => {
         messageHandler?.(null);
@@ -265,11 +306,11 @@ describe('useFactCheckRunner', () => {
       );
 
       const callback1 = result.current;
-      
+
       // Rerender with same props
       rerender({ language: 'en', timeoutSec: 9 });
       const callback2 = result.current;
-      
+
       expect(callback1).toBe(callback2);
     });
 
@@ -280,11 +321,11 @@ describe('useFactCheckRunner', () => {
       );
 
       const callback1 = result.current;
-      
+
       // Rerender with different language
       rerender({ language: 'zh-CN', timeoutSec: 9 });
       const callback2 = result.current;
-      
+
       expect(callback1).not.toBe(callback2);
     });
 
@@ -295,11 +336,11 @@ describe('useFactCheckRunner', () => {
       );
 
       const callback1 = result.current;
-      
+
       // Rerender with different timeout
       rerender({ language: 'en', timeoutSec: 15 });
       const callback2 = result.current;
-      
+
       expect(callback1).not.toBe(callback2);
     });
 
@@ -310,16 +351,16 @@ describe('useFactCheckRunner', () => {
         postMessage: vi.fn(),
         disconnect: vi.fn(),
       };
-      
+
       global.chrome.runtime.connect.mockReturnValue(mockPort);
       global.chrome.runtime.lastError = null;
 
       let messageHandler: ((msg: unknown) => void) | undefined;
-      
+
       mockPort.onMessage.addListener.mockImplementation((handler) => {
         messageHandler = handler;
       });
-      
+
       mockPort.onDisconnect.addListener.mockImplementation(() => {});
 
       const { result } = renderHook(

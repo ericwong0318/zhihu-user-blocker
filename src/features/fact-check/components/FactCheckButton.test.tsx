@@ -15,15 +15,14 @@ describe('FactCheckButton', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     document.body.innerHTML = '';
-    
+
     // Default mock for useFactCheckAction
     (useFactCheckAction as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
       loading: false,
       result: null,
       provider: null,
       error: null,
-      progress: 0,
-      stage: '',
+      thinkingText: '',
       handleClick: mockHandleClick,
     });
   });
@@ -35,13 +34,13 @@ describe('FactCheckButton', () => {
 
   it('should render Fact Check button when enabled', () => {
     render(<FactCheckButton enabled={true} text="Test claim" onFactCheck={mockOnFactCheck} />);
-    
+
     expect(screen.getByRole('button', { name: /fact check/i })).toBeInTheDocument();
   });
 
   it('should render Fact Check button when disabled', () => {
     render(<FactCheckButton enabled={false} text="Test claim" onFactCheck={mockOnFactCheck} />);
-    
+
     const button = screen.getByRole('button', { name: /fact check/i });
     expect(button).toBeInTheDocument();
     expect(button).toBeDisabled();
@@ -49,14 +48,14 @@ describe('FactCheckButton', () => {
 
   it('should show tooltip with correct aria-label when enabled', () => {
     render(<FactCheckButton enabled={true} text="Test claim" onFactCheck={mockOnFactCheck} />);
-    
+
     const tooltip = screen.getByLabelText('AI fact-check this answer');
     expect(tooltip).toBeInTheDocument();
   });
 
   it('should show tooltip with correct aria-label when disabled', () => {
     render(<FactCheckButton enabled={false} text="Test claim" onFactCheck={mockOnFactCheck} />);
-    
+
     const tooltip = screen.getByLabelText('Configure a provider in Options');
     expect(tooltip).toBeInTheDocument();
   });
@@ -64,39 +63,39 @@ describe('FactCheckButton', () => {
   it('should call handleClick when button is clicked', async () => {
     // Use a fresh render for each test to avoid portal cleanup issues
     const { unmount } = render(<FactCheckButton enabled={true} text="Test claim" onFactCheck={mockOnFactCheck} />);
-    
+
     await act(async () => {
       screen.getByRole('button', { name: /fact check/i }).click();
     });
 
     expect(mockHandleClick).toHaveBeenCalledTimes(1);
-    
+
     unmount();
   });
 
   it('should have correct button variant and size', () => {
     const { container, unmount } = render(<FactCheckButton enabled={true} text="Test claim" onFactCheck={mockOnFactCheck} />);
-    
+
     const button = container.querySelector('button');
     // MUI applies variant and size as CSS classes
     expect(button).toHaveClass('MuiButton-outlined');
     expect(button).toHaveClass('MuiButton-sizeSmall');
-    
+
     unmount();
   });
 
   it('should have FactCheckIcon as startIcon', () => {
     const { container, unmount } = render(<FactCheckButton enabled={true} text="Test claim" onFactCheck={mockOnFactCheck} />);
-    
+
     const button = container.querySelector('button');
     expect(button?.querySelector('svg')).toBeInTheDocument();
-    
+
     unmount();
   });
 
   it('should pass enabled prop to handleClick', async () => {
     const { unmount } = render(<FactCheckButton enabled={true} text="Test claim" onFactCheck={mockOnFactCheck} />);
-    
+
     await act(async () => {
       screen.getByRole('button', { name: /fact check/i }).click();
     });
@@ -109,7 +108,7 @@ describe('FactCheckButton', () => {
       undefined, // question
       mockOnFactCheck // onFactCheck
     );
-    
+
     unmount();
   });
 });

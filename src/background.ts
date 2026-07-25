@@ -71,7 +71,6 @@ chrome.runtime.onMessage.addListener((request: Request, sender, sendResponse) =>
         {
           factCheckConfigs: null,
           factCheckConfig: null,
-          factCheckTimeoutSec: 9,
         },
         (result) => {
           const configs = normalizeFactCheckConfigs(
@@ -84,13 +83,7 @@ chrome.runtime.onMessage.addListener((request: Request, sender, sendResponse) =>
             return;
           }
 
-          const timeoutSec = Math.min(
-            Math.max(Number(result.factCheckTimeoutSec) || 9, 1),
-            120,
-          );
-          const timeoutMs = timeoutSec * 1000;
-
-          callProviders(request.text ?? '', request.question, configs, undefined, timeoutMs).then(
+          callProviders(request.text ?? '', request.question, configs).then(
             (res) => {
               if (res.ok)
                 sendResponse({ result: res.result, provider: res.provider });
@@ -123,7 +116,6 @@ if (chrome.runtime.onConnect) {
         {
           factCheckConfigs: null,
           factCheckConfig: null,
-          factCheckTimeoutSec: 9,
         },
         (result) => {
           const configs = normalizeFactCheckConfigs(
@@ -135,12 +127,6 @@ if (chrome.runtime.onConnect) {
             port.postMessage({ disabled: true });
             return;
           }
-
-          const timeoutSec = Math.min(
-            Math.max(Number(result.factCheckTimeoutSec) || 9, 1),
-            120,
-          );
-          const timeoutMs = timeoutSec * 1000;
 
           const controller = new AbortController();
           let portClosed = false;
@@ -162,7 +148,6 @@ if (chrome.runtime.onConnect) {
             msg.question,
             configs,
             onStage,
-            timeoutMs,
             controller.signal,
           )
             .then((res) => {

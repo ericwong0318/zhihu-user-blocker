@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Box,
   Button,
@@ -6,7 +6,6 @@ import {
   Popover,
   Typography,
   Divider,
-  LinearProgress,
   Tooltip,
   ThemeProvider,
   createTheme,
@@ -18,7 +17,7 @@ import {
   Verdict,
   FactCheckLanguage,
 } from '../prompt';
-import { runFactCheckPipeline, MAX_FACTCHECK_MS } from '../pipeline';
+import { runFactCheckPipeline } from '../pipeline';
 import { normalizeFactCheckConfigs } from '../storage';
 
 const VERDICT_COLOR: Record<Verdict, 'success' | 'warning' | 'default'> = {
@@ -39,8 +38,7 @@ type Props = {
   // disabled and explains where to set one up.
   enabled: boolean;
   // Talks to the background service worker. Accepts an onStage callback so the
-  // UI can show which provider/model is being contacted and recount its timer
-  // when the pipeline falls back to the next provider.
+  // UI can stream live "AI thinking" stages as they happen.
   onFactCheck: (
     text: string,
     onStage?: (stage: string, isRetry?: boolean) => void,
@@ -66,15 +64,26 @@ const FactCheck: React.FC<Props> = ({ text, enabled, onFactCheck }) => {
   const [provider, setProvider] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [language, setLanguage] = useState<FactCheckLanguage>('en');
-  const [progress, setProgress] = useState(0);
-  const [stage, setStage] = useState<string>('');
+  // Streaming AI thinking text - accumulates as it streams
+  const [thinkingText, setThinkingText] = useState<string>('');
   // The primary (first) configured provider, used to label the live stage.
   const [providerInfo, setProviderInfo] = useState<{
     provider?: string;
     model?: string;
   } | null>(null);
-  // Per-attempt timeout (ms) from the Options page; drives the progress bar.
-  const [timeoutMs, setTimeoutMs] = useState(MAX_FACTCHECK_MS);
+  // Ref to the thinking text container for auto-scrolling
+  const thinkingRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to bottom when thinking text updates
+  const scrollToBottom = useCallback(() => {
+    if (thinkingRef.current) {
+      thinkingRef.current.scrollTop = thinkingRef.current.scrollHeight;
+    }
+  }, []);
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [thinkingText, scrollToBottom]);
 
   useEffect(() => {
     if (
@@ -104,20 +113,13 @@ const FactCheck: React.FC<Props> = ({ text, enabled, onFactCheck }) => {
       }
     };
 
-    const applyTimeout = (value: unknown) => {
-      const sec = Math.min(Math.max(Number(value) || 9, 1), 120);
-      setTimeoutMs(sec * 1000);
-    };
-
     chrome.storage.sync.get(
-      { factCheckConfigs: null, factCheckConfig: null, factCheckTimeoutSec: 9 },
+      { factCheckConfigs: null, factCheckConfig: null },
       (result: {
         factCheckConfigs: unknown | null;
         factCheckConfig: unknown | null;
-        factCheckTimeoutSec: unknown;
       }) => {
         applyProviderConfig(result);
-        applyTimeout(result.factCheckTimeoutSec);
       },
     );
 
@@ -134,14 +136,6 @@ const FactCheck: React.FC<Props> = ({ text, enabled, onFactCheck }) => {
         };
         applyProviderConfig(stored);
       }
-
-      if (changes.factCheckTimeoutSec) {
-        const sec = Math.min(
-          Math.max(Number(changes.factCheckTimeoutSec.newValue) || 9, 1),
-          120,
-        );
-        setTimeoutMs(sec * 1000);
-      }
     };
 
     if (chrome.storage.onChanged) {
@@ -157,37 +151,25 @@ const FactCheck: React.FC<Props> = ({ text, enabled, onFactCheck }) => {
     if (result || error) return; // already fetched, just show popover
     setLoading(true);
     setError(null);
-    setProgress(0);
-    setStage('Starting…');
-    // Drive the progress bar from 0 -> 100 over the configured per-attempt
-    // timeout. Each fallback resets the bar (see onStage below), so every
-    // provider attempt gets its own full-duration countdown.
-    const tick = Math.max(50, Math.floor(timeoutMs / 100));
-    const timer = window.setInterval(() => {
-      setProgress((prev) =>
-        prev >= 100 ? 100 : prev + 100 * (tick / timeoutMs),
-      );
-    }, tick);
+    setThinkingText('');
     try {
       const onStage = (s: string, isRetry?: boolean) => {
-        // When a fallback to another provider happens, recount the progress
-        // bar so each attempt gets its own 9 seconds.
-        if (isRetry) {
-          setProgress(0);
-          setStage('Retrying with another provider…');
-        } else {
-          // If the provider name is known locally, show it; otherwise trust
-          // the stage string coming from the background worker.
-          if (
-            s.startsWith('Contacting AI provider…') &&
-            providerInfo?.provider
-          ) {
-            const model = providerInfo.model ? ` (${providerInfo.model})` : '';
-            setStage(`Contacting ${providerInfo.provider}${model}…`);
-          } else {
-            setStage(s);
-          }
+        // Enrich the provider label when the background worker reports
+        // "Contacting AI provider…" — substitute the locally-known provider.
+        let display = s;
+        if (
+          s.startsWith('Contacting AI provider…') &&
+          providerInfo?.provider
+        ) {
+          const model = providerInfo.model ? ` (${providerInfo.model})` : '';
+          display = `Contacting ${providerInfo.provider}${model}…`;
         }
+        // Append to thinking text with a newline, prefix with retry indicator if needed
+        setThinkingText((prev) => {
+          const prefix = isRetry ? 'Retrying… ' : '';
+          const newLine = prev ? '\n\n' : '';
+          return `${prev}${newLine}${prefix}${display}`;
+        });
       };
       const res = await runFactCheckPipeline(
         text,
@@ -207,16 +189,13 @@ const FactCheck: React.FC<Props> = ({ text, enabled, onFactCheck }) => {
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
-      window.clearInterval(timer);
-      setProgress(100);
       setLoading(false);
     }
   };
 
   const handleClose = () => {
     setAnchor(null);
-    setProgress(0);
-    setStage('');
+    setThinkingText('');
   };
 
   return (
@@ -231,136 +210,163 @@ const FactCheck: React.FC<Props> = ({ text, enabled, onFactCheck }) => {
           verticalAlign: 'middle',
         }}
       >
-      <Tooltip title={enabled ? 'AI fact-check this answer' : 'Configure a provider in Options'}>
-        <Box component="span">
-          <Button
-            size="small"
-            variant="outlined"
-            startIcon={<FactCheckIcon />}
-            onClick={handleClick}
-            disabled={!enabled}
-          >
-            Fact Check
-          </Button>
-        </Box>
-      </Tooltip>
-
-      <Popover
-        open={open}
-        anchorEl={anchor}
-        onClose={handleClose}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
-        transformOrigin={{ vertical: 'top', horizontal: 'left' }}
-        slotProps={{
-          paper: {
-            sx: { p: 2, maxWidth: 360, maxHeight: 420, overflowY: 'auto' },
-          },
-        }}
-      >
-        {loading && (
-          <Box sx={{ width: '100%', minWidth: 240 }}>
-            <Box sx={{ mb: 0.5 }}>
-              <Typography variant="body2" color="text.secondary">
-                {stage || 'Analyzing…'}
-              </Typography>
-            </Box>
-            <LinearProgress variant="determinate" value={progress} />
+        <Tooltip
+          title={
+            enabled ? 'AI fact-check this answer' : 'Configure a provider in Options'
+          }
+        >
+          <Box component="span">
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={<FactCheckIcon />}
+              onClick={handleClick}
+              disabled={!enabled}
+            >
+              Fact Check
+            </Button>
           </Box>
-        )}
+        </Tooltip>
 
-        {!loading && error && (
-          <Typography variant="body2" color="error">
-            {error}
-          </Typography>
-        )}
-
-        {!loading && result && (
-          <Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-              <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
-                Fact Check
+        <Popover
+          open={open}
+          anchorEl={anchor}
+          onClose={handleClose}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+          transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+          slotProps={{
+            paper: {
+              sx: { p: 2, maxWidth: 360, maxHeight: 420, overflowY: 'auto' },
+            },
+          }}
+        >
+          {loading && (
+            <Box sx={{ width: '100%', minWidth: 240 }}>
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                sx={{ mb: 0.5 }}
+              >
+                AI is thinking…
               </Typography>
-              <Chip
-                size="small"
-                label={VERDICT_LABEL[result.verdict]}
-                color={VERDICT_COLOR[result.verdict]}
-              />
-              {provider && (
+              <Box
+                ref={thinkingRef}
+                sx={{
+                  fontFamily: 'monospace',
+                  fontSize: '0.875rem',
+                  lineHeight: 1.6,
+                  color: 'text.primary',
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-word',
+                  minHeight: 60,
+                  maxHeight: 200,
+                  overflowY: 'auto',
+                  borderLeft: '3px solid',
+                  borderColor: 'primary.main',
+                  pl: 1.5,
+                  py: 0.5,
+                  backgroundColor: 'action.hover',
+                  borderRadius: 1,
+                }}
+              >
+                {thinkingText || <Typography color="text.secondary" variant="body2">Starting analysis…</Typography>}
+              </Box>
+            </Box>
+          )}
+
+          {!loading && error && (
+            <Typography variant="body2" color="error">
+              {error}
+            </Typography>
+          )}
+
+          {!loading && result && (
+            <Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+                  Fact Check
+                </Typography>
                 <Chip
                   size="small"
-                  variant="outlined"
-                  label={`via ${provider}`}
+                  label={VERDICT_LABEL[result.verdict]}
+                  color={VERDICT_COLOR[result.verdict]}
                 />
+                {provider && (
+                  <Chip
+                    size="small"
+                    variant="outlined"
+                    label={`via ${provider}`}
+                  />
+                )}
+              </Box>
+              <Divider sx={{ mb: 1.5 }} />
+
+              <Section
+                title="Formal Logic — Validity vs. Truth"
+                body={result.validityVsTruth}
+              />
+              <Section title="Ethos (Credibility)" body={result.rhetoric.ethos} />
+              <Section title="Pathos (Emotion)" body={result.rhetoric.pathos} />
+              <Section
+                title="Logos (Logic / Reason)"
+                body={result.rhetoric.logos}
+              />
+
+              {result.fallacies.length > 0 && (
+                <Box sx={{ mb: 1.5 }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                    Informal Fallacies
+                  </Typography>
+                  {result.fallacies.map((f, i) => (
+                    <Box key={i} sx={{ mb: 1 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        {f.name}
+                      </Typography>
+                      {f.quote && (
+                        <Typography
+                          variant="body2"
+                          component="blockquote"
+                          sx={{
+                            borderLeft: '3px solid',
+                            borderColor: 'divider',
+                            pl: 1,
+                            my: 0.5,
+                          }}
+                        >
+                          “{f.quote}”
+                        </Typography>
+                      )}
+                      <Typography variant="body2" color="text.secondary">
+                        {f.explanation}
+                      </Typography>
+                    </Box>
+                  ))}
+                </Box>
+              )}
+
+              {result.sources && result.sources.length > 0 && (
+                <Box>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                    Sources
+                  </Typography>
+                  {result.sources.map((s, i) => (
+                    <Typography
+                      key={i}
+                      variant="body2"
+                      component="a"
+                      href={s.url}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      {s.title || s.url}
+                    </Typography>
+                  ))}
+                </Box>
               )}
             </Box>
-            <Divider sx={{ mb: 1.5 }} />
-
-            <Section
-              title="Formal Logic — Validity vs. Truth"
-              body={result.validityVsTruth}
-            />
-            <Section title="Ethos (Credibility)" body={result.rhetoric.ethos} />
-            <Section title="Pathos (Emotion)" body={result.rhetoric.pathos} />
-            <Section
-              title="Logos (Logic / Reason)"
-              body={result.rhetoric.logos}
-            />
-
-            {result.fallacies.length > 0 && (
-              <Box sx={{ mb: 1.5 }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                  Informal Fallacies
-                </Typography>
-                {result.fallacies.map((f, i) => (
-                  <Box key={i} sx={{ mb: 1 }}>
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                      {f.name}
-                    </Typography>
-                    {f.quote && (
-                      <Typography
-                        variant="body2"
-                        component="blockquote"
-                        sx={{
-                          borderLeft: '3px solid',
-                          borderColor: 'divider',
-                          pl: 1,
-                          my: 0.5,
-                        }}
-                      >
-                        “{f.quote}”
-                      </Typography>
-                    )}
-                    <Typography variant="body2" color="text.secondary">
-                      {f.explanation}
-                    </Typography>
-                  </Box>
-                ))}
-              </Box>
-            )}
-
-            {result.sources && result.sources.length > 0 && (
-              <Box>
-                <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                  Sources
-                </Typography>
-                {result.sources.map((s, i) => (
-                  <Typography
-                    key={i}
-                    variant="body2"
-                    component="a"
-                    href={s.url}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    {s.title || s.url}
-                  </Typography>
-                ))}
-              </Box>
-            )}
-          </Box>
-        )}
-      </Popover>
-    </Box>
+          )}
+        </Popover>
+      </Box>
     </ThemeProvider>
   );
 };
