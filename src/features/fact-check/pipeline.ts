@@ -20,6 +20,8 @@ import { parse, ParsedInput, getParsingSummary } from './agents/Parser';
 import { runLogic, LogicOutput, getLogicSummary } from './agents/Logic';
 import { analyzeBias, BiasOutput, getBiasSummary } from './agents/Bias';
 import { synthesize, CriticOutput, getCriticSummary } from './agents/Critic';
+import { NewsFetcherConfig } from './agents/NewsFetcher';
+import { NewsApiConfig } from './providers/newsapi';
 
 // Maximum time (ms) a SINGLE provider attempt is allowed before it is aborted.
 // Each attempt gets its own 9s window; on timeout the pipeline falls back to
@@ -55,7 +57,7 @@ export const runFactCheckPipelineLocal = async (
 
   // 3️⃣ Bias – rhetorical and cognitive bias analysis
   onStage?.('Analyzing bias & rhetoric…');
-  const bias: BiasOutput = await analyzeBias(logic, language);
+  const bias: BiasOutput = await analyzeBias(logic, text, language);
 
   // 4️⃣ Critic – synthesize final verdict
   onStage?.('Synthesizing verdict…');
@@ -98,7 +100,7 @@ export const runFactCheckPipeline = async (
   const logic: LogicOutput = await runLogic(parsed, language);
 
   onStage?.('Analyzing bias & rhetoric…', false);
-  const bias: BiasOutput = await analyzeBias(logic, language);
+  const bias: BiasOutput = await analyzeBias(logic, text, language);
 
   onStage?.('Synthesizing verdict…', false);
   const critic: CriticOutput = await synthesize({ parsed, logic, bias, language }, language);

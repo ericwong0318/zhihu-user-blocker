@@ -9,6 +9,7 @@ const KNOWN_PROVIDERS: ProviderId[] = [
   'deepseek',
   'openrouter',
   'other',
+  'newsapi',
 ];
 
 const KNOWN_LANGUAGES: FactCheckLanguage[] = ['zh-CN', 'zh-TW', 'en'];

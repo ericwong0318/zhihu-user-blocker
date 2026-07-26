@@ -36,6 +36,29 @@ export {
   LANGUAGE_LABELS,
 } from './prompt';
 
+// NewsAPI.ai provider
+export {
+  type NewsApiConfig,
+  type NewsSearchParams,
+  type NewsArticle,
+  type NewsSearchResult,
+  searchNewsApi,
+  fetchNewsApiArticle,
+  factCheckLanguageToNewsApiLang,
+  isNewsApiConfigured,
+  DEFAULT_NEWSAPI_URL,
+} from './providers';
+
+// NewsFetcher agent
+export {
+  fetchRelevantNews,
+  extractKeywordsFromClaims,
+  filterAndRankArticles,
+  type NewsFetcherConfig,
+  type NewsFetchResult,
+  getNewsFetchSummary,
+} from './agents/NewsFetcher';
+
 // Components
 export { default as FactCheck } from './components/FactCheck';
 export { FactCheckButton, type FactCheckButtonProps } from './components/FactCheckButton';

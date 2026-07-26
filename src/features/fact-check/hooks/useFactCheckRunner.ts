@@ -8,6 +8,7 @@ export const runFactCheck = (
   question: string | undefined,
   language: string,
   onStage?: StageReporter,
+  timeoutSec?: number,
 ): Promise<unknown> => {
   return new Promise((resolve) => {
     if (!chrome.runtime?.connect) {
@@ -56,17 +57,17 @@ export const runFactCheck = (
       if (chrome.runtime.lastError) finish({ error: chrome.runtime.lastError.message });
       else if (!settled) finish({ error: 'Connection closed.' });
     });
-    port.postMessage({ text, question, language });
+    port.postMessage({ text, question, language, timeoutSec });
   });
 };
 
-export const useFactCheckRunner = (language: string) => {
+export const useFactCheckRunner = (language: string, timeoutSec?: number) => {
   return useCallback(
     (
       text: string,
       question?: string,
       onStage?: StageReporter,
-    ) => runFactCheck(text, question, language, onStage),
-    [language],
+    ) => runFactCheck(text, question, language, onStage, timeoutSec),
+    [language, timeoutSec],
   );
 };
