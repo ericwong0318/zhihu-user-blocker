@@ -1,5 +1,38 @@
 # Changelog
 
+## [1.6.0](https://github.com/ericwong0318/chrome-extensions/compare/v1.5.0...v1.6.0) (2026-07-26)
+
+
+### Features
+
+* add AI provider logging for fact-check feature ([cded4d9](https://github.com/ericwong0318/chrome-extensions/commit/cded4d9ceb122e56c9b5861e0f9c3b9429774fe7))
+* add Enable Fact Check toggle in options page ([4346c1d](https://github.com/ericwong0318/chrome-extensions/commit/4346c1d915ac5b20fdc74ee681e39f4f58adbaaf))
+* add NewsAPI.ai (Event Registry) provider for real-time news fact-checking ([01b43e6](https://github.com/ericwong0318/chrome-extensions/commit/01b43e6c98a50b8f7e59596ef9a72592cfd042ae))
+* add provider timeout with 3-minute default and increase max tokens ([4d09b16](https://github.com/ericwong0318/chrome-extensions/commit/4d09b16ba8f52d558c7728c069f90f9295cb04ef))
+* **config:** add coverage thresholds and expand eslint ignores ([645029e](https://github.com/ericwong0318/chrome-extensions/commit/645029e8bf326df241529a7f1998833e0b07ba71))
+* enhance AI provider logging with detailed prompt/response tracking ([ef30bd7](https://github.com/ericwong0318/chrome-extensions/commit/ef30bd79d13672e72c2f0de17eba64457c904c31))
+* enhance fact-check pipeline agents with functional implementations\n\n- Fix Bias.ts regex patterns (add gi flags for matchAll compatibility)\n- Fix Bias.ts import (ExtractedClaim from Parser)\n- Fix Logic.ts TypeScript inference issue\n- Fix Parser.ts language detection (zh parameter mapping)\n- Fix Parser.ts traditional Chinese detection\n- Fix Parser.ts URL extraction and title extraction from markdown links\n- Implement splitIntoSentences for claim extraction\n- Improve claim classification with patterns and confidence scoring\n- Fix table deduplication in extractMarkdownElements and extractResources\n- Add comprehensive tests for all agents ([0433137](https://github.com/ericwong0318/chrome-extensions/commit/043313734d21a2e5a21885debb83837df6b6979b))
+* enhance fact-check pipeline with improved logic and bias analysis ([913652f](https://github.com/ericwong0318/chrome-extensions/commit/913652fbc51290be98de80ff6f523e65100265d1))
+* enhance LogViewer to display detailed AI provider logs ([9d0a0f7](https://github.com/ericwong0318/chrome-extensions/commit/9d0a0f7b224f8cbc60221b10c32aa215fd840346))
+* include Zhihu question in fact-check prompt ([325d71c](https://github.com/ericwong0318/chrome-extensions/commit/325d71c88bbd4f7fdb0ebaec6c43739bfa1bdb92))
+* remove NewsAPI option from UI and provider configuration ([246bcc5](https://github.com/ericwong0318/chrome-extensions/commit/246bcc59fef50c32344e3a25b24a2fdcc8db1713))
+* replace fact-check progress bar with streaming AI thinking flow ([b0586f3](https://github.com/ericwong0318/chrome-extensions/commit/b0586f3bc2a032f5cdfd632de425209f2c94b7af))
+
+
+### Bug Fixes
+
+* add 'zh' language shorthand support in Parser agent ([91a6417](https://github.com/ericwong0318/chrome-extensions/commit/91a6417ff24d676c7b361243e90ef619aac91a06))
+* BlockUserList component for Options page ([7854dda](https://github.com/ericwong0318/chrome-extensions/commit/7854dda26cf15ca3d3710173b594d47be28c7e80))
+* hide blocked user's answer content when loaded from storage ([232feb4](https://github.com/ericwong0318/chrome-extensions/commit/232feb4604d6efbc46be2ee09c0032a636d40872))
+* parse error in release-please-config.json ([a7c9161](https://github.com/ericwong0318/chrome-extensions/commit/a7c9161c5cb3bcf87a7cb99ad69c29d3a49aa16e))
+* pass AbortSignal instead of number to callProvider in Options.tsx ([b9e09e7](https://github.com/ericwong0318/chrome-extensions/commit/b9e09e7c0de6549a2f28901d85587551b28f1ce6))
+* remove unused timeoutMs parameter from background message handler ([d440072](https://github.com/ericwong0318/chrome-extensions/commit/d440072f644b21f38cfaac246b6a2f20e0ed7901))
+* resolve TypeScript build errors in Parser.ts ([fd82cb1](https://github.com/ericwong0318/chrome-extensions/commit/fd82cb1ee5931bb9e1c559b70da3d95bac98a38f))
+* return full response object from background in useFactCheckRunner ([3f7f518](https://github.com/ericwong0318/chrome-extensions/commit/3f7f518a7a512ee54f7fb167188a84f9d786208d))
+* unwrap nested provider result before passing to UI ([9597e4b](https://github.com/ericwong0318/chrome-extensions/commit/9597e4b739def1141e5b16823c2c0eb2fa7ac75b))
+* update LogViewer message for clarity ([d81e658](https://github.com/ericwong0318/chrome-extensions/commit/d81e6589fe9ce26f2ee9520b2dbf74b806f6a472))
+* use global setTimeout/clearTimeout in fact-check providers for Service Worker compatibility ([2059d18](https://github.com/ericwong0318/chrome-extensions/commit/2059d18d1c3ef9d7b1ff83722ff6a39f4f8e5270))
+
 ## [1.5.0](https://github.com/ericwong0318/chrome-extensions/compare/v1.4.1...v1.5.0) (2026-07-24)
 
 
