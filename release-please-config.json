@@ -1,9 +1,5 @@
 {
   "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
-  // Using "node" release-type because this is a Node.js-based project (Vite/TypeScript build)
-  // that publishes to Chrome Web Store, not npm. The version sync between package.json
-  // and manifest.json is handled via extra-files. "simple" type would also work but
-  // "node" provides conventional commit parsing which we use.
   "release-type": "node",
   "bump-minor-pre-major": true,
   "bump-patch-for-minor-pre-major": false,
