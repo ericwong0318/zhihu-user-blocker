@@ -13,6 +13,9 @@
 
 import { FactCheckLanguage } from '../prompt';
 
+/** Internal language hint type - accepts 'zh' as shorthand for 'zh-CN' */
+export type LanguageHint = FactCheckLanguage | 'zh';
+
 export type ParsedInput = {
   /** Cleaned text ready for the next stage */
   cleanedText: string;
@@ -167,7 +170,7 @@ const DEFINITION_PATTERNS = [
  */
 export const parse = (
   raw: string,
-  lang: FactCheckLanguage = 'en',
+  lang: LanguageHint = 'en',
 ): ParsedInput => {
   const originalLength = raw.length;
 
@@ -187,7 +190,10 @@ export const parse = (
   const resources = extractResources(raw);
 
   // 6. Detect language (use hint if provided and not 'en')
-  const detectedLanguage = lang !== 'en' ? lang : detectLanguage(cleaned, lang);
+  // Normalize 'zh' to 'zh-CN' for backwards compatibility
+  const normalizedLang = lang === 'zh' ? 'zh-CN' : lang;
+  const effectiveHint = normalizedLang === 'zh-CN' || normalizedLang === 'zh-TW' ? normalizedLang : 'en';
+  const detectedLanguage = effectiveHint !== 'en' ? effectiveHint : detectLanguage(cleaned, effectiveHint);
 
   // 7. Compute stats
   const stats: ParsingStats = {
@@ -437,7 +443,9 @@ function extractClaims(text: string, urls: string[]): ExtractedClaim[] {
     currentPos = end;
 
     // Skip very short sentences (lowered threshold for better coverage)
-    if (trimmed.length < 15) continue;
+    // But allow shorter sentences if they have strong claim indicators
+    const hasStrongIndicators = /\d+%|study|research|shows|proves|evidence|According|published/i.test(trimmed);
+    if (trimmed.length < 15 && !hasStrongIndicators) continue;
 
     const claimType = classifyClaim(trimmed);
     const confidence = calculateClaimConfidence(trimmed, claimType);
@@ -451,6 +459,23 @@ function extractClaims(text: string, urls: string[]): ExtractedClaim[] {
         confidence,
         position: { start, end },
         supportingUrls,
+      });
+    }
+  }
+  
+  // If no claims found, try without sentence splitting
+  if (claims.length === 0 && text.trim().length > 0) {
+    const fullText = text.trim();
+    const claimType = classifyClaim(fullText);
+    const confidence = calculateClaimConfidence(fullText, claimType);
+    
+    if (confidence >= 0.1) {
+      claims.push({
+        text: fullText,
+        type: claimType,
+        confidence,
+        position: { start: 0, end: fullText.length },
+        supportingUrls: findSupportingUrls(fullText, urls),
       });
     }
   }
@@ -468,6 +493,12 @@ function splitIntoSentences(text: string): string[] {
     .split(/(?<=[.!?。！？])\s+/)
     .map(s => s.trim())
     .filter(s => s.length > 0);
+  
+  // If no sentences found, treat the whole text as one sentence
+  if (sentences.length === 0 && text.trim().length > 0) {
+    return [text.trim()];
+  }
+  
   return sentences;
 }
 
@@ -654,6 +685,11 @@ function detectLanguage(text: string, hintLang: FactCheckLanguage): FactCheckLan
     
     if (tradCount > simpCount) return 'zh-TW';
     return 'zh-CN';
+  }
+
+  // If hint suggests Chinese but ratio is low, trust the hint
+  if (hintLang === 'zh-CN' || hintLang === 'zh-TW') {
+    return hintLang;
   }
 
   return 'en';
