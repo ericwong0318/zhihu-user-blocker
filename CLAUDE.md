@@ -100,6 +100,11 @@ Breaking changes should be indicated with `BREAKING CHANGE:` in the commit body 
 - **Loading States**: All async operations require visible loading indicators.
 - **Error Feedback**: Display errors to users; do not silently fail.
 
+### Terminal Command Rules
+
+- Do NOT pipe test runners or build commands to `head` or `tail` directly (e.g., `vitest ... | head`).
+- When running Vitest, run the target test file directly without piping stdout.
+
 ---
 
 
