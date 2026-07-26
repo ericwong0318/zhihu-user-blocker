@@ -230,7 +230,7 @@ const LogViewer: React.FC = () => {
         </Box>
 
         {logs.length === 0 ? (
-          <Typography variant="body1">No logs recorded.</Typography>
+          <Typography variant="body1">No errors logged.</Typography>
         ) : (
           <List disablePadding>
             {[...logs].reverse().map((log, idx) => (
