@@ -538,6 +538,8 @@ const Options: React.FC = () => {
           </Box>
         </Box>
 
+        <Divider sx={{ my: 3 }} />
+
         <LogViewer />
       </Paper>
     </ThemeProvider>
