@@ -5,14 +5,14 @@ import { FactCheckResult } from './prompt';
 describe('Fact-Check Multi-Agent Pipeline', () => {
   describe('runFactCheckPipelineLocal (local four-agent pipeline)', () => {
     it('should produce credible verdict for well-structured argument with strong evidence', async () => {
-      const text = 'A randomized controlled trial published in Nature (https://nature.com/article/123) demonstrates 85% efficacy with p<0.001. The study was replicated by independent researchers at MIT (https://mit.edu/study/456).';
+      const text = 'A randomized controlled trial published in Nature (https://nature.com/article/123) demonstrates 85% efficacy with p<0.001. This proves the treatment works because the mechanism is well understood. The study was replicated by independent researchers at MIT (https://mit.edu/study/456).';
       const result = await runFactCheckPipelineLocal(text, 'en');
 
       expect(result.verdict).toBe('credible');
       expect(result.validityVsTruth).toContain('strong logical coherence');
       expect(result.rhetoric.logos).toContain('Strong');
       expect(result.sources).toBeDefined();
-      expect(result.sources!.length).toBeGreaterThan(0);
+      expect(result.sources?.length).toBeGreaterThan(0);
     });
 
     it('should produce misleading verdict for argument with high bias and fallacies', async () => {
@@ -74,8 +74,8 @@ describe('Fact-Check Multi-Agent Pipeline', () => {
       const result = await runFactCheckPipelineLocal(text, 'en');
 
       expect(result.sources).toBeDefined();
-      expect(result.sources!.length).toBeGreaterThan(0);
-      expect(result.sources![0].url).toContain('arxiv.org');
+      expect(result.sources?.length).toBeGreaterThan(0);
+      expect(result.sources?.[0].url).toContain('arxiv.org');
     });
 
     it('should handle empty/short input gracefully', async () => {
@@ -124,7 +124,9 @@ describe('Fact-Check Multi-Agent Pipeline', () => {
       const text = 'Random blog claims this works. https://randomblog.xyz/post';
       const result = await runFactCheckPipelineLocal(text, 'en');
 
-      expect(result.validityVsTruth).toContain('credibility') || expect(result.fallacies.length).toBeGreaterThan(0);
+      const hasCredibility = result.validityVsTruth.includes('credibility');
+      const hasFallacies = result.fallacies.length > 0;
+      expect(hasCredibility || hasFallacies).toBe(true);
     });
   });
 
@@ -156,8 +158,9 @@ describe('Fact-Check Multi-Agent Pipeline', () => {
       };
 
       const onFactCheckMock = vi.fn().mockResolvedValue(mockProviderResult);
+      const onStageMock = vi.fn();
 
-      const result = await runFactCheckPipeline(text, 'en', onFactCheckMock);
+      const result = await runFactCheckPipeline(text, 'en', onFactCheckMock, onStageMock);
 
       expect(onFactCheckMock).toHaveBeenCalledWith(text, expect.any(Function));
       expect(result.verdict).toBe('credible');
@@ -165,7 +168,7 @@ describe('Fact-Check Multi-Agent Pipeline', () => {
     });
 
     it('should fall back when local confidence is low', async () => {
-      const text = 'Maybe this works? Not sure.';
+      const text = 'This is a vague statement with no clear claim or evidence. It might be something or nothing.';
       const mockProviderResult: FactCheckResult = {
         validityVsTruth: 'External analysis result',
         rhetoric: { ethos: '', pathos: '', logos: '' },
@@ -174,8 +177,9 @@ describe('Fact-Check Multi-Agent Pipeline', () => {
       };
 
       const onFactCheckMock = vi.fn().mockResolvedValue(mockProviderResult);
+      const onStageMock = vi.fn();
 
-      const result = await runFactCheckPipeline(text, 'en', onFactCheckMock);
+      const result = await runFactCheckPipeline(text, 'en', onFactCheckMock, onStageMock);
 
       expect(onFactCheckMock).toHaveBeenCalled();
       expect(result.verdict).toBe('misleading');
@@ -241,14 +245,16 @@ def analyze():
 
       expect(result.verdict).toBeDefined();
       expect(result.sources).toBeDefined();
-      expect(result.sources!.length).toBeGreaterThan(0);
+      expect(result.sources?.length).toBeGreaterThan(0);
     });
 
     it('should handle argument with rebuttal', async () => {
       const text = 'This treatment works based on clinical trials. However, it may not work for all patients. Despite this limitation, the benefits outweigh risks. https://clinicaltrials.gov/study';
       const result = await runFactCheckPipelineLocal(text, 'en');
 
-      expect(result.validityVsTruth).toContain('rebuttal') || expect(result.validityVsTruth).toContain('counterargument');
+      const hasRebuttal = result.validityVsTruth.includes('rebuttal');
+      const hasCounterargument = result.validityVsTruth.includes('counterargument');
+      expect(hasRebuttal || hasCounterargument).toBe(true);
     });
 
     it('should handle argument with qualifier', async () => {

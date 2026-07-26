@@ -15,17 +15,6 @@ import {
   FactCheckLanguage,
 } from './prompt';
 import { logError, logWarn, logAiProvider } from '../../features/logging';
-import {
-  type NewsApiConfig,
-  type NewsSearchParams,
-  type NewsArticle,
-  type NewsSearchResult,
-  searchNewsApi,
-  fetchNewsApiArticle,
-  factCheckLanguageToNewsApiLang,
-  isNewsApiConfigured,
-  DEFAULT_NEWSAPI_URL,
-} from './providers/newsapi';
 
 export type ProviderId =
   | 'claude'

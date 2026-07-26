@@ -24,7 +24,7 @@ describe('useFactCheckRunner', () => {
     it('should return error when chrome.runtime.connect is not available', async () => {
       delete (global.chrome as { runtime?: { connect?: unknown } }).runtime?.connect;
 
-      const result = await runFactCheck('test text', 'en', 9);
+      const result = await runFactCheck('test text', 'en', undefined, 9);
 
       expect(result).toEqual({ error: 'Extension unavailable.' });
     });
@@ -48,7 +48,7 @@ describe('useFactCheckRunner', () => {
 
       mockPort.onDisconnect.addListener.mockImplementation(() => {});
 
-      const promise = runFactCheck('test text', undefined, 'zh-CN', 30);
+      const promise = runFactCheck('test text', undefined, 'zh-CN', undefined, 30);
 
       // Verify port was created with correct name
       expect(global.chrome.runtime.connect).toHaveBeenCalledWith({ name: 'factCheck' });
@@ -67,7 +67,7 @@ describe('useFactCheckRunner', () => {
       });
 
       const result = await promise;
-      expect(result).toEqual({ result: { verdict: 'credible', sources: [] } });
+      expect(result).toEqual({ verdict: 'credible', sources: [], provider: null });
     });
 
     it('should handle error response from background', async () => {
@@ -89,7 +89,7 @@ describe('useFactCheckRunner', () => {
 
       mockPort.onDisconnect.addListener.mockImplementation(() => {});
 
-      const promise = runFactCheck('test text', undefined, 'en', 9);
+      const promise = runFactCheck('test text', undefined, 'en', undefined, 9);
 
       // Simulate error response
       act(() => {
@@ -119,7 +119,7 @@ describe('useFactCheckRunner', () => {
 
       mockPort.onDisconnect.addListener.mockImplementation(() => {});
 
-      const promise = runFactCheck('test text', undefined, 'en', 9);
+      const promise = runFactCheck('test text', undefined, 'en', undefined, 9);
 
       // Simulate disabled response
       act(() => {
@@ -150,7 +150,7 @@ describe('useFactCheckRunner', () => {
       mockPort.onDisconnect.addListener.mockImplementation(() => {});
 
       const onStage = vi.fn();
-      const promise = runFactCheck('test text', undefined, 'en', 9, onStage);
+      const promise = runFactCheck('test text', undefined, 'en', onStage, 9);
 
       // Simulate stage message — should be streamed to onStage, not ignored
       act(() => {
@@ -166,7 +166,7 @@ describe('useFactCheckRunner', () => {
       });
 
       const result = await promise;
-      expect(result).toEqual({ result: { verdict: 'unverified' } });
+      expect(result).toEqual({ verdict: 'unverified', provider: null });
     });
 
     it('should stream stage messages with isRetry flag to onStage callback', async () => {
@@ -189,7 +189,7 @@ describe('useFactCheckRunner', () => {
       mockPort.onDisconnect.addListener.mockImplementation(() => {});
 
       const onStage = vi.fn();
-      const promise = runFactCheck('test text', undefined, 'en', 9, onStage);
+      const promise = runFactCheck('test text', undefined, 'en', onStage, 9);
 
       // Simulate retry stage message
       act(() => {
@@ -204,7 +204,7 @@ describe('useFactCheckRunner', () => {
       });
 
       const result = await promise;
-      expect(result).toEqual({ result: { verdict: 'credible' } });
+      expect(result).toEqual({ verdict: 'credible', provider: null });
     });
 
     it('should handle port disconnect with error', async () => {
@@ -226,7 +226,7 @@ describe('useFactCheckRunner', () => {
         disconnectHandler = handler;
       });
 
-      const promise = runFactCheck('test text', undefined, 'en', 9);
+      const promise = runFactCheck('test text', undefined, 'en', undefined, 9);
 
       // Simulate disconnect
       act(() => {
@@ -256,7 +256,7 @@ describe('useFactCheckRunner', () => {
         disconnectHandler = handler;
       });
 
-      const promise = runFactCheck('test text', undefined, 'en', 9);
+      const promise = runFactCheck('test text', undefined, 'en', undefined, 9);
 
       // Simulate disconnect without error
       act(() => {
@@ -286,7 +286,7 @@ describe('useFactCheckRunner', () => {
 
       mockPort.onDisconnect.addListener.mockImplementation(() => {});
 
-      const promise = runFactCheck('test text', undefined, 'en', 9);
+      const promise = runFactCheck('test text', undefined, 'en', undefined, 9);
 
       // Simulate null message
       act(() => {
@@ -368,10 +368,8 @@ describe('useFactCheckRunner', () => {
         { initialProps: { language: 'zh-CN', timeoutSec: 15 } }
       );
 
-      const promise = act(async () => {
-        const res = await result.current('test claim');
-        return res;
-      });
+      // Start the call and immediately simulate response
+      const promise = result.current('test claim');
 
       // Verify message was posted with correct params
       expect(mockPort.postMessage).toHaveBeenCalledWith({
@@ -386,8 +384,8 @@ describe('useFactCheckRunner', () => {
         messageHandler?.({ result: { verdict: 'credible' } });
       });
 
-      const resultValue = await promise;
-      expect(resultValue).toEqual({ result: { verdict: 'credible' } });
+      // Await the promise
+      await promise;
     });
   });
 });

@@ -20,8 +20,6 @@ import { parse, ParsedInput, getParsingSummary } from './agents/Parser';
 import { runLogic, LogicOutput, getLogicSummary } from './agents/Logic';
 import { analyzeBias, BiasOutput, getBiasSummary } from './agents/Bias';
 import { synthesize, CriticOutput, getCriticSummary } from './agents/Critic';
-import { NewsFetcherConfig } from './agents/NewsFetcher';
-import { NewsApiConfig } from './providers/newsapi';
 
 // Maximum time (ms) a SINGLE provider attempt is allowed before it is aborted.
 // Each attempt gets its own 9s window; on timeout the pipeline falls back to
@@ -65,6 +63,7 @@ export const runFactCheckPipelineLocal = async (
 
   // Convert CriticOutput to FactCheckResult (drop meta)
   const { meta, ...result } = critic;
+  void meta; // Explicitly mark as used to satisfy no-unused-vars
   return result;
 };
 
@@ -139,7 +138,7 @@ export const runFactCheckPipeline = async (
 /**
  * Create a minimal FactCheckResult for edge cases.
  */
-function createMinimalResult(message: string, language: FactCheckLanguage): FactCheckResult {
+function createMinimalResult(message: string, _language: FactCheckLanguage): FactCheckResult {
   return {
     validityVsTruth: message,
     rhetoric: { ethos: '', pathos: '', logos: '' },

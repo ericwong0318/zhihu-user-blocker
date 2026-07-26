@@ -23,8 +23,9 @@ describe('Bias Agent', () => {
 
   describe('analyzeBias', () => {
     it('should return BiasOutput with all required fields', async () => {
-      const logicOutput = createMockLogicOutput();
-      const result = await analyzeBias(logicOutput);
+      const text = 'Test argument with some content.';
+      const logicOutput = createMockLogicOutput({ summary: text });
+      const result = await analyzeBias(logicOutput, text);
 
       expect(result).toHaveProperty('rhetoric');
       expect(result).toHaveProperty('cognitiveBiases');
@@ -40,141 +41,131 @@ describe('Bias Agent', () => {
     });
 
     it('should detect pathos-heavy rhetoric with emotional language', async () => {
-      const logicOutput = createMockLogicOutput({
-        summary: 'This is terrifying and heartbreaking! Think of the children! We must act now or face catastrophe!',
-      });
-      const result = await analyzeBias(logicOutput);
+      const text = 'This is terrifying and heartbreaking! Think of the children! We must act now or face catastrophe!';
+      const logicOutput = createMockLogicOutput({ summary: text });
+      const result = await analyzeBias(logicOutput, text);
 
       expect(result.rhetoric.pathos.level).toBe('high');
       expect(result.rhetoric.overallBalance).toBe('pathos-heavy');
     });
 
     it('should detect logos-heavy rhetoric with logical indicators', async () => {
-      const logicOutput = createMockLogicOutput({
-        summary: 'The data shows 75% effectiveness. Research demonstrates significant correlation. Therefore, the conclusion follows logically from the evidence.',
-      });
-      const result = await analyzeBias(logicOutput);
+      const text = 'The data shows 75% effectiveness. Research demonstrates significant correlation. Therefore, the conclusion follows logically from the evidence.';
+      const logicOutput = createMockLogicOutput({ summary: text });
+      const result = await analyzeBias(logicOutput, text);
 
       expect(result.rhetoric.logos.level).toBe('high');
       expect(result.rhetoric.overallBalance).toBe('logos-heavy');
     });
 
     it('should detect ethos-heavy rhetoric with authority indicators', async () => {
-      const logicOutput = createMockLogicOutput({
-        summary: 'As a professor with 20 years of experience and published peer-reviewed research, I can confirm this is true based on my expertise.',
-      });
-      const result = await analyzeBias(logicOutput);
+      const text = 'As a professor with 20 years of experience and published peer-reviewed research, I can confirm this is true based on my expertise.';
+      const logicOutput = createMockLogicOutput({ summary: text });
+      const result = await analyzeBias(logicOutput, text);
 
       expect(result.rhetoric.ethos.level).toBe('high');
       expect(result.rhetoric.overallBalance).toBe('ethos-heavy');
     });
 
     it('should detect confirmation bias', async () => {
-      const logicOutput = createMockLogicOutput({
-        summary: 'This confirms my belief. I only look for evidence that supports my view and ignore contradicting facts.',
-      });
-      const result = await analyzeBias(logicOutput);
+      const text = 'This confirms my belief. I only look for evidence that supports my view and ignore contradicting facts.';
+      const logicOutput = createMockLogicOutput({ summary: text });
+      const result = await analyzeBias(logicOutput, text);
 
       const confirmationBias = result.cognitiveBiases.find(b => b.name === 'Confirmation Bias');
       expect(confirmationBias).toBeDefined();
       expect(confirmationBias?.category).toBe('decision');
+      expect(confirmationBias?.confidence).toBeGreaterThan(0.5);
     });
 
     it('should detect availability heuristic', async () => {
-      const logicOutput = createMockLogicOutput({
-        summary: 'This just happened recently! Everyone is talking about this viral story. It must be important.',
-      });
-      const result = await analyzeBias(logicOutput);
+      const text = 'This just happened recently! Everyone is talking about this viral story. It must be important.';
+      const logicOutput = createMockLogicOutput({ summary: text });
+      const result = await analyzeBias(logicOutput, text);
 
       const availability = result.cognitiveBiases.find(b => b.name === 'Availability Heuristic');
       expect(availability).toBeDefined();
     });
 
     it('should detect anchoring bias', async () => {
-      const logicOutput = createMockLogicOutput({
-        summary: 'The first number was 100. Starting from that initial estimate, we can adjust slightly.',
-      });
-      const result = await analyzeBias(logicOutput);
+      const text = 'The first number was 100. Starting from that initial estimate, we can adjust slightly.';
+      const logicOutput = createMockLogicOutput({ summary: text });
+      const result = await analyzeBias(logicOutput, text);
 
       const anchoring = result.cognitiveBiases.find(b => b.name === 'Anchoring Bias');
       expect(anchoring).toBeDefined();
     });
 
     it('should detect bandwagon effect', async () => {
-      const logicOutput = createMockLogicOutput({
-        summary: 'Everyone is using this! Millions of people agree. It is the most popular choice.',
-      });
-      const result = await analyzeBias(logicOutput);
+      const text = 'Everyone is using this! Millions of people agree. It is the most popular choice.';
+      const logicOutput = createMockLogicOutput({ summary: text });
+      const result = await analyzeBias(logicOutput, text);
 
       const bandwagon = result.cognitiveBiases.find(b => b.name === 'Bandwagon Effect');
       expect(bandwagon).toBeDefined();
     });
 
     it('should detect authority bias', async () => {
-      const logicOutput = createMockLogicOutput({
-        summary: 'Dr. Smith says this is true. As an expert, the authority recommends this approach.',
-      });
-      const result = await analyzeBias(logicOutput);
+      const text = 'Dr. Smith says this is true. As an expert, the authority recommends this approach.';
+      const logicOutput = createMockLogicOutput({ summary: text });
+      const result = await analyzeBias(logicOutput, text);
 
       const authority = result.cognitiveBiases.find(b => b.name === 'Authority Bias');
       expect(authority).toBeDefined();
     });
 
     it('should detect sunk cost fallacy', async () => {
-      const logicOutput = createMockLogicOutput({
-        summary: 'We have already invested so much time and money. We can not stop now or it would be a waste.',
-      });
-      const result = await analyzeBias(logicOutput);
+      const text = 'We have already invested so much time and money. We can not stop now or it would be a waste.';
+      const logicOutput = createMockLogicOutput({ summary: text });
+      const result = await analyzeBias(logicOutput, text);
 
       const sunkCost = result.cognitiveBiases.find(b => b.name === 'Sunk Cost Fallacy');
       expect(sunkCost).toBeDefined();
+      expect(sunkCost?.confidence).toBeGreaterThan(0.5);
     });
 
     it('should detect optimism bias', async () => {
-      const logicOutput = createMockLogicOutput({
-        summary: 'This will definitely work! It is guaranteed to succeed. There is no risk of failure.',
-      });
-      const result = await analyzeBias(logicOutput);
+      const text = 'This will definitely work! It is guaranteed to succeed. There is no risk of failure.';
+      const logicOutput = createMockLogicOutput({ summary: text });
+      const result = await analyzeBias(logicOutput, text);
 
       const optimism = result.cognitiveBiases.find(b => b.name === 'Optimism Bias');
       expect(optimism).toBeDefined();
     });
 
     it('should detect negativity bias', async () => {
-      const logicOutput = createMockLogicOutput({
-        summary: 'This is the worst thing ever. Nothing works. Everything fails. Terrible disaster.',
-      });
-      const result = await analyzeBias(logicOutput);
+      const text = 'This is the worst thing ever. Nothing works. Everything fails. Terrible disaster.';
+      const logicOutput = createMockLogicOutput({ summary: text });
+      const result = await analyzeBias(logicOutput, text);
 
       const negativity = result.cognitiveBiases.find(b => b.name === 'Negativity Bias');
       expect(negativity).toBeDefined();
     });
 
     it('should detect survivorship bias', async () => {
-      const logicOutput = createMockLogicOutput({
-        summary: 'The successful people show this works. Those who failed are ignored.',
-      });
-      const result = await analyzeBias(logicOutput);
+      const text = 'The successful people show this works. Those who failed are ignored.';
+      const logicOutput = createMockLogicOutput({ summary: text });
+      const result = await analyzeBias(logicOutput, text);
 
       const survivorship = result.cognitiveBiases.find(b => b.name === 'Survivorship Bias');
       expect(survivorship).toBeDefined();
+      expect(survivorship?.confidence).toBeGreaterThan(0.5);
     });
 
     it('should detect false cause / correlation-causation', async () => {
-      const logicOutput = createMockLogicOutput({
-        summary: 'After the event happened, the result occurred. Therefore the event caused the result.',
-      });
-      const result = await analyzeBias(logicOutput);
+      const text = 'After the event happened, the result occurred. Therefore the event caused the result.';
+      const logicOutput = createMockLogicOutput({ summary: text });
+      const result = await analyzeBias(logicOutput, text);
 
       const falseCause = result.cognitiveBiases.find(b => b.name === 'False Cause / Correlation-Causation');
       expect(falseCause).toBeDefined();
+      expect(falseCause?.confidence).toBeGreaterThan(0.5);
     });
 
     it('should detect social proof persuasion technique', async () => {
-      const logicOutput = createMockLogicOutput({
-        summary: 'Join millions of satisfied customers! Trusted by thousands. 95% of users recommend this.',
-      });
-      const result = await analyzeBias(logicOutput);
+      const text = 'Join millions of satisfied customers! Trusted by thousands. 95% of users recommend this.';
+      const logicOutput = createMockLogicOutput({ summary: text });
+      const result = await analyzeBias(logicOutput, text);
 
       const socialProof = result.persuasionTechniques.find(t => t.name === 'Social Proof');
       expect(socialProof).toBeDefined();
@@ -182,10 +173,9 @@ describe('Bias Agent', () => {
     });
 
     it('should detect scarcity technique', async () => {
-      const logicOutput = createMockLogicOutput({
-        summary: 'Only 3 left! Limited time offer. Last chance to buy before it is gone.',
-      });
-      const result = await analyzeBias(logicOutput);
+      const text = 'Only 3 left! Limited time offer. Last chance to buy before it is gone.';
+      const logicOutput = createMockLogicOutput({ summary: text });
+      const result = await analyzeBias(logicOutput, text);
 
       const scarcity = result.persuasionTechniques.find(t => t.name === 'Scarcity');
       expect(scarcity).toBeDefined();
@@ -193,50 +183,45 @@ describe('Bias Agent', () => {
     });
 
     it('should detect reciprocity technique', async () => {
-      const logicOutput = createMockLogicOutput({
-        summary: 'Get a free gift! We give you this bonus for free. In return for your support.',
-      });
-      const result = await analyzeBias(logicOutput);
+      const text = 'Get a free gift! We give you this bonus for free. In return for your support.';
+      const logicOutput = createMockLogicOutput({ summary: text });
+      const result = await analyzeBias(logicOutput, text);
 
       const reciprocity = result.persuasionTechniques.find(t => t.name === 'Reciprocity');
       expect(reciprocity).toBeDefined();
     });
 
     it('should detect commitment & consistency technique', async () => {
-      const logicOutput = createMockLogicOutput({
-        summary: 'As someone who cares about this issue, you should pledge to support us. Stay consistent with your values.',
-      });
-      const result = await analyzeBias(logicOutput);
+      const text = 'As someone who cares about this issue, you should pledge to support us. Stay consistent with your values.';
+      const logicOutput = createMockLogicOutput({ summary: text });
+      const result = await analyzeBias(logicOutput, text);
 
       const commitment = result.persuasionTechniques.find(t => t.name === 'Commitment & Consistency');
       expect(commitment).toBeDefined();
     });
 
     it('should detect unity technique', async () => {
-      const logicOutput = createMockLogicOutput({
-        summary: 'We are all in this together. Our community stands united against them. Join our tribe.',
-      });
-      const result = await analyzeBias(logicOutput);
+      const text = 'We are all in this together. Our community stands united against them. Join our tribe.';
+      const logicOutput = createMockLogicOutput({ summary: text });
+      const result = await analyzeBias(logicOutput, text);
 
       const unity = result.persuasionTechniques.find(t => t.name === 'Unity');
       expect(unity).toBeDefined();
     });
 
     it('should detect framing effect technique', async () => {
-      const logicOutput = createMockLogicOutput({
-        summary: 'Save 90%! Gain significant benefits. Avoid the 10% failure rate. This is an opportunity.',
-      });
-      const result = await analyzeBias(logicOutput);
+      const text = 'Save 90%! Gain significant benefits. Avoid the 10% failure rate. This is an opportunity.';
+      const logicOutput = createMockLogicOutput({ summary: text });
+      const result = await analyzeBias(logicOutput, text);
 
       const framing = result.persuasionTechniques.find(t => t.name === 'Framing Effect');
       expect(framing).toBeDefined();
     });
 
     it('should detect gain framing', async () => {
-      const logicOutput = createMockLogicOutput({
-        summary: 'You will gain benefits and improve your situation. This advantage will enhance your results.',
-      });
-      const result = await analyzeBias(logicOutput);
+      const text = 'You will gain benefits and improve your situation. This advantage will enhance your results.';
+      const logicOutput = createMockLogicOutput({ summary: text });
+      const result = await analyzeBias(logicOutput, text);
 
       const gainFrame = result.framing.frames.find(f => f.name === 'Gain Frame');
       expect(gainFrame).toBeDefined();
@@ -244,10 +229,9 @@ describe('Bias Agent', () => {
     });
 
     it('should detect loss framing', async () => {
-      const logicOutput = createMockLogicOutput({
-        summary: 'You will lose money and miss out. The cost and risk of damage.',
-      });
-      const result = await analyzeBias(logicOutput);
+      const text = 'You will lose money and miss out. The cost and risk of damage.';
+      const logicOutput = createMockLogicOutput({ summary: text });
+      const result = await analyzeBias(logicOutput, text);
 
       const lossFrame = result.framing.frames.find(f => f.name === 'Loss Frame');
       expect(lossFrame).toBeDefined();
@@ -255,20 +239,18 @@ describe('Bias Agent', () => {
     });
 
     it('should detect moral framing', async () => {
-      const logicOutput = createMockLogicOutput({
-        summary: 'This is the right thing to do. It is ethical and just. The moral choice is clear.',
-      });
-      const result = await analyzeBias(logicOutput);
+      const text = 'This is the right thing to do. It is ethical and just. The moral choice is clear.';
+      const logicOutput = createMockLogicOutput({ summary: text });
+      const result = await analyzeBias(logicOutput, text);
 
       const moralFrame = result.framing.frames.find(f => f.name === 'Moral Frame');
       expect(moralFrame).toBeDefined();
     });
 
     it('should detect fear mongering', async () => {
-      const logicOutput = createMockLogicOutput({
-        summary: 'If we do not act now, catastrophe will strike! This is the end of the world. Imminent doom approaches.',
-      });
-      const result = await analyzeBias(logicOutput);
+      const text = 'If we do not act now, catastrophe will strike! This is the end of the world. Imminent doom approaches.';
+      const logicOutput = createMockLogicOutput({ summary: text });
+      const result = await analyzeBias(logicOutput, text);
 
       const fearMongering = result.emotionalManipulation.techniques.find(t => t.name === 'Fear Mongering');
       expect(fearMongering).toBeDefined();
@@ -277,10 +259,9 @@ describe('Bias Agent', () => {
     });
 
     it('should detect guilt tripping', async () => {
-      const logicOutput = createMockLogicOutput({
-        summary: 'How could you be so selfish? Think of the children! You should feel guilty if you do not help.',
-      });
-      const result = await analyzeBias(logicOutput);
+      const text = 'How could you be so selfish? Think of the children! You should feel guilty if you do not help.';
+      const logicOutput = createMockLogicOutput({ summary: text });
+      const result = await analyzeBias(logicOutput, text);
 
       const guiltTrip = result.emotionalManipulation.techniques.find(t => t.name === 'Guilt Tripping');
       expect(guiltTrip).toBeDefined();
@@ -288,10 +269,9 @@ describe('Bias Agent', () => {
     });
 
     it('should detect gaslighting', async () => {
-      const logicOutput = createMockLogicOutput({
-        summary: 'You are crazy and imagining things. That never happened. Everyone agrees with me, not you.',
-      });
-      const result = await analyzeBias(logicOutput);
+      const text = 'You are crazy and imagining things. That never happened. Everyone agrees with me, not you.';
+      const logicOutput = createMockLogicOutput({ summary: text });
+      const result = await analyzeBias(logicOutput, text);
 
       const gaslighting = result.emotionalManipulation.techniques.find(t => t.name === 'Gaslighting');
       expect(gaslighting).toBeDefined();
@@ -299,10 +279,9 @@ describe('Bias Agent', () => {
     });
 
     it('should detect false urgency', async () => {
-      const logicOutput = createMockLogicOutput({
-        summary: 'Act now! Today only! Do not wait! Limited time offer ends in 2 hours!',
-      });
-      const result = await analyzeBias(logicOutput);
+      const text = 'Act now! Today only! Do not wait! Limited time offer ends in 2 hours!';
+      const logicOutput = createMockLogicOutput({ summary: text });
+      const result = await analyzeBias(logicOutput, text);
 
       const falseUrgency = result.emotionalManipulation.techniques.find(t => t.name === 'False Urgency');
       expect(falseUrgency).toBeDefined();
@@ -310,10 +289,9 @@ describe('Bias Agent', () => {
     });
 
     it('should detect us vs them manipulation', async () => {
-      const logicOutput = createMockLogicOutput({
-        summary: 'They are the enemy trying to destroy us. Protect our way of life from those people. Save our future.',
-      });
-      const result = await analyzeBias(logicOutput);
+      const text = 'They are the enemy trying to destroy us. Protect our way of life from those people. Save our future.';
+      const logicOutput = createMockLogicOutput({ summary: text });
+      const result = await analyzeBias(logicOutput, text);
 
       const usVsThem = result.emotionalManipulation.techniques.find(t => t.name === 'Us vs Them');
       expect(usVsThem).toBeDefined();
@@ -321,7 +299,9 @@ describe('Bias Agent', () => {
     });
 
     it('should assess source credibility for academic domains', async () => {
+      const text = 'Test argument with academic source.';
       const logicOutput = createMockLogicOutput({
+        summary: text,
         evidenceAssessments: [{
           claim: { text: 'Test', type: 'factual', confidence: 0.8, position: { start: 0, end: 4 }, supportingUrls: ['https://arxiv.org/abs/1234'] },
           supportingUrls: [{ url: 'https://arxiv.org/abs/1234', title: '', context: '', isLikelyCitation: true }],
@@ -330,16 +310,19 @@ describe('Bias Agent', () => {
           suggestedQueries: [],
         }],
       });
-      const result = await analyzeBias(logicOutput);
+      const result = await analyzeBias(logicOutput, text);
 
       expect(result.sourceCredibility.sources.length).toBeGreaterThan(0);
       const source = result.sourceCredibility.sources[0];
       expect(source.credibility).toBe('high');
       expect(source.domain).toContain('arxiv.org');
+      expect(result.sourceCredibility.overallCredibility).toBe('high');
     });
 
     it('should assess source credibility for reputable news', async () => {
+      const text = 'Test argument with news source.';
       const logicOutput = createMockLogicOutput({
+        summary: text,
         evidenceAssessments: [{
           claim: { text: 'Test', type: 'factual', confidence: 0.8, position: { start: 0, end: 4 }, supportingUrls: ['https://reuters.com/article/123'] },
           supportingUrls: [{ url: 'https://reuters.com/article/123', title: '', context: '', isLikelyCitation: true }],
@@ -348,14 +331,16 @@ describe('Bias Agent', () => {
           suggestedQueries: [],
         }],
       });
-      const result = await analyzeBias(logicOutput);
+      const result = await analyzeBias(logicOutput, text);
 
       const source = result.sourceCredibility.sources[0];
       expect(source.credibility).toBe('moderate');
     });
 
     it('should assess low credibility for unknown domains', async () => {
+      const text = 'Test argument with unknown source.';
       const logicOutput = createMockLogicOutput({
+        summary: text,
         evidenceAssessments: [{
           claim: { text: 'Test', type: 'factual', confidence: 0.8, position: { start: 0, end: 4 }, supportingUrls: ['https://randomblog.xyz/post'] },
           supportingUrls: [{ url: 'https://randomblog.xyz/post', title: '', context: '', isLikelyCitation: false }],
@@ -364,17 +349,17 @@ describe('Bias Agent', () => {
           suggestedQueries: [],
         }],
       });
-      const result = await analyzeBias(logicOutput);
+      const result = await analyzeBias(logicOutput, text);
 
       const source = result.sourceCredibility.sources[0];
       expect(source.credibility).toBe('low');
+      expect(result.sourceCredibility.overallCredibility).toBe('low');
     });
 
     it('should generate meaningful summary', async () => {
-      const logicOutput = createMockLogicOutput({
-        summary: 'Test argument with some emotional language.',
-      });
-      const result = await analyzeBias(logicOutput);
+      const text = 'Test argument with some emotional language.';
+      const logicOutput = createMockLogicOutput({ summary: text });
+      const result = await analyzeBias(logicOutput, text);
 
       expect(result.summary).toBeDefined();
       expect(result.summary.length).toBeGreaterThan(0);
@@ -382,36 +367,34 @@ describe('Bias Agent', () => {
     });
 
     it('should calculate bias score between 0 and 1', async () => {
-      const logicOutput = createMockLogicOutput({
-        summary: 'Terrifying catastrophe! Everyone agrees! Act now or die! Limited time!',
-      });
-      const result = await analyzeBias(logicOutput);
+      const text = 'Terrifying catastrophe! Everyone agrees! Act now or die! Limited time!';
+      const logicOutput = createMockLogicOutput({ summary: text });
+      const result = await analyzeBias(logicOutput, text);
 
       expect(result.biasScore).toBeGreaterThanOrEqual(0);
       expect(result.biasScore).toBeLessThanOrEqual(1);
     });
 
     it('should have lower bias score for logos-heavy balanced argument', async () => {
-      const logicOutput = createMockLogicOutput({
-        summary: 'Data shows 75% effectiveness. Research confirms the results. Logical analysis follows from evidence.',
-      });
-      const result = await analyzeBias(logicOutput);
+      const text = 'Data shows 75% effectiveness. Research confirms the results. Logical analysis follows from evidence.';
+      const logicOutput = createMockLogicOutput({ summary: text });
+      const result = await analyzeBias(logicOutput, text);
 
       expect(result.biasScore).toBeLessThan(0.5);
     });
 
     it('should have higher bias score for pathos-heavy manipulative argument', async () => {
-      const logicOutput = createMockLogicOutput({
-        summary: 'Terrifying disaster! Think of the children! You are selfish if you disagree! Everyone knows this! Act now!',
-      });
-      const result = await analyzeBias(logicOutput);
+      const text = 'Terrifying disaster! Think of the children! You are selfish if you disagree! Everyone knows this! Act now!';
+      const logicOutput = createMockLogicOutput({ summary: text });
+      const result = await analyzeBias(logicOutput, text);
 
       expect(result.biasScore).toBeGreaterThan(0.3);
     });
 
     it('should handle empty input gracefully', async () => {
+      const text = '';
       const logicOutput = createMockLogicOutput({
-        summary: '',
+        summary: text,
         toulminStructure: {
           claim: null,
           grounds: [],
@@ -422,7 +405,7 @@ describe('Bias Agent', () => {
           confidence: 0,
         },
       });
-      const result = await analyzeBias(logicOutput);
+      const result = await analyzeBias(logicOutput, text);
 
       expect(result.rhetoric.overallBalance).toBe('balanced');
       expect(result.cognitiveBiases).toEqual([]);
@@ -433,30 +416,27 @@ describe('Bias Agent', () => {
     });
 
     it('should deduplicate cognitive biases at similar positions', async () => {
-      const logicOutput = createMockLogicOutput({
-        summary: 'This confirms my belief and supports my view and proves my theory.',
-      });
-      const result = await analyzeBias(logicOutput);
+      const text = 'This confirms my belief and supports my view and proves my theory.';
+      const logicOutput = createMockLogicOutput({ summary: text });
+      const result = await analyzeBias(logicOutput, text);
 
       const confirmationBiases = result.cognitiveBiases.filter(b => b.name === 'Confirmation Bias');
       expect(confirmationBiases.length).toBeLessThanOrEqual(1);
     });
 
     it('should deduplicate persuasion techniques at similar positions', async () => {
-      const logicOutput = createMockLogicOutput({
-        summary: 'Join millions of users! Trusted by thousands! Everyone is using this!',
-      });
-      const result = await analyzeBias(logicOutput);
+      const text = 'Join millions of users! Trusted by thousands! Everyone is using this!';
+      const logicOutput = createMockLogicOutput({ summary: text });
+      const result = await analyzeBias(logicOutput, text);
 
       const socialProofs = result.persuasionTechniques.filter(t => t.name === 'Social Proof');
       expect(socialProofs.length).toBeLessThanOrEqual(1);
     });
 
     it('should provide bias summary for debugging', async () => {
-      const logicOutput = createMockLogicOutput({
-        summary: 'Test argument.',
-      });
-      const result = await analyzeBias(logicOutput);
+      const text = 'Test argument.';
+      const logicOutput = createMockLogicOutput({ summary: text });
+      const result = await analyzeBias(logicOutput, text);
       const summary = getBiasSummary(result);
 
       expect(summary).toContain('Bias Analysis Summary');
@@ -471,90 +451,81 @@ describe('Bias Agent', () => {
     });
 
     it('should detect fundamental attribution error', async () => {
-      const logicOutput = createMockLogicOutput({
-        summary: 'He is lazy and stupid. It is his character flaw, not the situation.',
-      });
-      const result = await analyzeBias(logicOutput);
+      const text = 'He is lazy and stupid. It is his character flaw, not the situation.';
+      const logicOutput = createMockLogicOutput({ summary: text });
+      const result = await analyzeBias(logicOutput, text);
 
       const fae = result.cognitiveBiases.find(b => b.name === 'Fundamental Attribution Error');
       expect(fae).toBeDefined();
     });
 
     it('should detect halo effect', async () => {
-      const logicOutput = createMockLogicOutput({
-        summary: 'The beautiful successful person must be right. Good looking experts are trustworthy.',
-      });
-      const result = await analyzeBias(logicOutput);
+      const text = 'The beautiful successful person must be right. Good looking experts are trustworthy.';
+      const logicOutput = createMockLogicOutput({ summary: text });
+      const result = await analyzeBias(logicOutput, text);
 
       const halo = result.cognitiveBiases.find(b => b.name === 'Halo Effect');
       expect(halo).toBeDefined();
     });
 
     it('should detect likability technique', async () => {
-      const logicOutput = createMockLogicOutput({
-        summary: 'I understand, I have been there too. We are friends, just like you. I am honest and genuine.',
-      });
-      const result = await analyzeBias(logicOutput);
+      const text = 'I understand, I have been there too. We are friends, just like you. I am honest and genuine.';
+      const logicOutput = createMockLogicOutput({ summary: text });
+      const result = await analyzeBias(logicOutput, text);
 
       const likability = result.persuasionTechniques.find(t => t.name === 'Likability');
       expect(likability).toBeDefined();
     });
 
     it('should detect commitment & consistency technique', async () => {
-      const logicOutput = createMockLogicOutput({
-        summary: 'You promised to support this. Stay consistent with your pledge. As someone who values this, you must agree.',
-      });
-      const result = await analyzeBias(logicOutput);
+      const text = 'You promised to support this. Stay consistent with your pledge. As someone who values this, you must agree.';
+      const logicOutput = createMockLogicOutput({ summary: text });
+      const result = await analyzeBias(logicOutput, text);
 
       const commitment = result.persuasionTechniques.find(t => t.name === 'Commitment & Consistency');
       expect(commitment).toBeDefined();
     });
 
     it('should detect economic frame', async () => {
-      const logicOutput = createMockLogicOutput({
-        summary: 'The cost is affordable. Price is low. Budget friendly financial decision.',
-      });
-      const result = await analyzeBias(logicOutput);
+      const text = 'The cost is affordable. Price is low. Budget friendly financial decision.';
+      const logicOutput = createMockLogicOutput({ summary: text });
+      const result = await analyzeBias(logicOutput, text);
 
       const economic = result.framing.frames.find(f => f.name === 'Economic Frame');
       expect(economic).toBeDefined();
     });
 
     it('should detect security frame', async () => {
-      const logicOutput = createMockLogicOutput({
-        summary: 'This protects your safety. Secure and safe. We guard your security.',
-      });
-      const result = await analyzeBias(logicOutput);
+      const text = 'This protects your safety. Secure and safe. We guard your security.';
+      const logicOutput = createMockLogicOutput({ summary: text });
+      const result = await analyzeBias(logicOutput, text);
 
       const security = result.framing.frames.find(f => f.name === 'Security Frame');
       expect(security).toBeDefined();
     });
 
     it('should detect freedom frame', async () => {
-      const logicOutput = createMockLogicOutput({
-        summary: 'You have the freedom to choose. Liberty and autonomy. Independent control.',
-      });
-      const result = await analyzeBias(logicOutput);
+      const text = 'You have the freedom to choose. Liberty and autonomy. Independent control.';
+      const logicOutput = createMockLogicOutput({ summary: text });
+      const result = await analyzeBias(logicOutput, text);
 
       const freedom = result.framing.frames.find(f => f.name === 'Freedom Frame');
       expect(freedom).toBeDefined();
     });
 
     it('should detect risk frame', async () => {
-      const logicOutput = createMockLogicOutput({
-        summary: 'There is a risk and uncertainty. Probability of chance. Likelihood and odds.',
-      });
-      const result = await analyzeBias(logicOutput);
+      const text = 'There is a risk and uncertainty. Probability of chance. Likelihood and odds.';
+      const logicOutput = createMockLogicOutput({ summary: text });
+      const result = await analyzeBias(logicOutput, text);
 
       const risk = result.framing.frames.find(f => f.name === 'Risk Frame');
       expect(risk).toBeDefined();
     });
 
     it('should detect anchoring in negotiation', async () => {
-      const logicOutput = createMockLogicOutput({
-        summary: 'Regular price was $100. Discount 50% off! Compare at $200!',
-      });
-      const result = await analyzeBias(logicOutput);
+      const text = 'Regular price was $100. Discount 50% off! Compare at $200!';
+      const logicOutput = createMockLogicOutput({ summary: text });
+      const result = await analyzeBias(logicOutput, text);
 
       const anchoring = result.persuasionTechniques.find(t => t.name === 'Anchoring in Negotiation');
       expect(anchoring).toBeDefined();

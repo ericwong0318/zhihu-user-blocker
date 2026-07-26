@@ -11,25 +11,27 @@ const changeListeners: Array<
 > = [];
 
 const makeArea = () => ({
-  get: (
-    keys: string | string[] | StorageItems | null,
-    cb?: (result: StorageItems) => void
-  ) => {
-    const result: StorageItems = {};
-    if (typeof keys === 'object' && keys !== null && !Array.isArray(keys)) {
-      for (const k of Object.keys(keys))
-        result[k] = k in store ? store[k] : keys[k];
-    } else if (typeof keys === 'string') {
-      result[keys] = store[keys];
-    }
-    if (cb) cb(result);
-    return Promise.resolve(result);
-  },
-  set: (items: StorageItems, cb?: () => void) => {
+  get: vi.fn(
+    (
+      keys: string | string[] | StorageItems | null,
+      cb?: (result: StorageItems) => void,
+    ) => {
+      const result: StorageItems = {};
+      if (typeof keys === 'object' && keys !== null && !Array.isArray(keys)) {
+        for (const k of Object.keys(keys))
+          result[k] = k in store ? store[k] : keys[k];
+      } else if (typeof keys === 'string') {
+        result[keys] = store[keys];
+      }
+      if (cb) cb(result);
+      return Promise.resolve(result);
+    },
+  ),
+  set: vi.fn((items: StorageItems, cb?: () => void) => {
     Object.assign(store, items);
     if (cb) cb();
     return Promise.resolve();
-  },
+  }),
 });
 
 const onChanged = {
@@ -55,6 +57,7 @@ export const mockChromeStorage = {
 };
 
 beforeEach(() => {
+  vi.clearAllMocks();
   store = {};
   changeListeners.length = 0;
   (global as Record<string, unknown>).chrome = { storage: mockChromeStorage };

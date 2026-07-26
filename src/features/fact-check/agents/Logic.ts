@@ -12,6 +12,8 @@
 
 import { FactCheckLanguage } from '../prompt';
 import { ParsedInput, ExtractedClaim, ExtractedUrl } from './Parser';
+import { NewsFetcherConfig, fetchRelevantNews } from './NewsFetcher';
+import { NewsArticle } from '../providers/newsapi';
 
 export type ToulminElement =
   | 'claim'
@@ -77,13 +79,13 @@ export type LogicOutput = {
 const FORMAL_FALLACIES = [
   {
     name: 'Affirming the Consequent',
-    pattern: /if\s+.+then\s+.+,\s*.+\s+(?:is|are)\s+.+,\s*therefore\s+.+/gi,
+    pattern: /if\s+.+then\s+.+[.,]\s*.+\s+(?:is|are)\s+.+[.,]\s*therefore\s+.+/gi,
     description: 'Assuming that if P implies Q, and Q is true, then P must be true.',
     severity: 'high' as const,
   },
   {
     name: 'Denying the Antecedent',
-    pattern: /if\s+.+then\s+.+,\s*(?:not\s+.+|.+\s+not)\s*,\s*therefore\s*(?:not\s+.+|.+\s+not)/gi,
+    pattern: /if\s+.+then\s+.+[.,]\s*(?:not\s+.+|.+\s+not)\s*[.,]\s*therefore\s*(?:not\s+.+|.+\s+not)/gi,
     description: 'Assuming that if P implies Q, and P is false, then Q must be false.',
     severity: 'high' as const,
   },
@@ -232,11 +234,13 @@ const INFORMAL_FALLACIES = [
  *
  * @param input    Parsed input from the Parser agent.
  * @param language UI language (currently unused but passed for future localization).
+ * @param newsFetcherConfig Optional configuration for fetching real-time news articles.
  * @returns        Structured logical analysis output.
  */
 export const runLogic = async (
   input: ParsedInput,
   _language: FactCheckLanguage = 'en',
+  newsFetcherConfig?: NewsFetcherConfig,
 ): Promise<LogicOutput> => {
   const { cleanedText, claims, urls } = input;
 
@@ -247,20 +251,46 @@ export const runLogic = async (
   const fallacies = detectFallacies(cleanedText, claims);
 
   // 3. Assess evidence for factual claims
-  const evidenceAssessments = assessEvidence(claims, urls);
+  let evidenceAssessments = assessEvidence(claims, urls);
 
-  // 4. Detect contradictions
+  // 4. Optionally fetch real-time news articles to enhance evidence
+  if (newsFetcherConfig) {
+    try {
+      const newsResult = await fetchRelevantNews(claims, newsFetcherConfig, _language);
+      if (newsResult.articles.length > 0) {
+        // Enhance evidence assessments with news articles
+        evidenceAssessments = enhanceEvidenceWithNews(evidenceAssessments, newsResult);
+      }
+    } catch (err) {
+      // Log error but don't fail the entire pipeline
+      console.warn('NewsFetcher failed:', err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  // 5. Detect contradictions
   const contradictions = detectContradictions(claims);
 
-  // 5. Calculate coherence score
-  const coherenceScore = calculateCoherenceScore(
+  // 6. Calculate coherence score
+  let coherenceScore = calculateCoherenceScore(
     toulminStructure,
     fallacies,
     evidenceAssessments,
     contradictions,
   );
+  
+  // Boost coherence score for well-structured arguments with strong evidence
+  const hasStrongEvidence = evidenceAssessments.some(e => e.evidenceQuality === 'strong');
+  const hasGoodStructure = toulminStructure.claim && toulminStructure.grounds.length > 0;
+  if (hasStrongEvidence && hasGoodStructure) {
+    coherenceScore = Math.min(1, coherenceScore + 0.4);
+  }
+  
+  // Additional boost if there's a warrant
+  if (toulminStructure.warrant) {
+    coherenceScore = Math.min(1, coherenceScore + 0.1);
+  }
 
-  // 6. Generate summary for next agent
+  // 7. Generate summary for next agent
   const summary = generateSummary(toulminStructure, fallacies, evidenceAssessments, contradictions);
 
   return {
@@ -276,7 +306,7 @@ export const runLogic = async (
 /**
  * Build Toulmin argument structure from claims
  */
-function buildToulminStructure(claims: ExtractedClaim[], text: string): ToulminStructure {
+function buildToulminStructure(claims: ExtractedClaim[], _text: string): ToulminStructure {
   // Find the main claim (usually the first factual claim or highest confidence claim)
   const factualClaims = claims.filter(c => c.type === 'factual');
   const opinionClaims = claims.filter(c => c.type === 'opinion');
@@ -355,7 +385,7 @@ function buildToulminStructure(claims: ExtractedClaim[], text: string): ToulminS
 /**
  * Detect logical fallacies in the text
  */
-function detectFallacies(text: string, claims: ExtractedClaim[]): LogicalFallacy[] {
+function detectFallacies(text: string, _claims: ExtractedClaim[]): LogicalFallacy[] {
   const fallacies: LogicalFallacy[] = [];
 
   // Check formal fallacies
@@ -442,7 +472,7 @@ function assessEvidence(claims: ExtractedClaim[], urls: ExtractedUrl[]): Evidenc
       const citationUrls = supportingUrls.filter(u => u.isLikelyCitation);
       const hasAcademicSource = supportingUrls.some(u =>
         /\.(?:edu|gov|org)(?:\/|$)/i.test(u.url) ||
-        /(?:arxiv|pubmed|doi|scholar|researchgate)/i.test(u.url),
+        /(?:arxiv|pubmed|doi|scholar|researchgate|nature|science|cell|pnas|nejm|jama|thelancet|bmj)/i.test(u.url),
       );
       const hasReputableSource = supportingUrls.some(u =>
         /\.(?:com|net|io)(?:\/|$)/i.test(u.url) &&
@@ -703,3 +733,79 @@ export const getLogicSummary = (output: LogicOutput): string => {
     `  Summary: ${output.summary}`
   );
 };
+
+/**
+ * Enhance evidence assessments with news articles from NewsFetcher
+ */
+function enhanceEvidenceWithNews(
+  assessments: EvidenceAssessment[],
+  newsResult: Awaited<ReturnType<typeof fetchRelevantNews>>
+): EvidenceAssessment[] {
+  if (newsResult.articles.length === 0) return assessments;
+
+  // Create a map of claim text to news articles for quick lookup
+  const articlesByClaim = new Map<string, NewsArticle[]>();
+  for (const [claimText, articles] of newsResult.articlesByClaim) {
+    articlesByClaim.set(claimText, articles);
+  }
+
+  return assessments.map(assessment => {
+    const claimText = assessment.claim.text;
+    const newsArticles = articlesByClaim.get(claimText) || [];
+    
+    // Convert news articles to URL-like objects for compatibility
+    const newsUrls = newsArticles.map(article => ({
+      url: article.url,
+      title: article.title,
+      context: `${article.source} - ${article.body.substring(0, 200)}...`,
+      isLikelyCitation: true,
+    })) as ExtractedUrl[];
+
+    // Combine existing URLs with news articles
+    const allSupportingUrls = [...assessment.supportingUrls, ...newsUrls];
+
+    // Re-evaluate evidence quality with news articles
+    let evidenceQuality = assessment.evidenceQuality;
+    let verificationNeeded = assessment.verificationNeeded;
+    const suggestedQueries = [...assessment.suggestedQueries];
+
+    if (newsArticles.length > 0) {
+      // Check if any news articles are from reputable sources
+      const reputableDomains = [
+        'reuters.com', 'apnews.com', 'bbc.com', 'nytimes.com', 'washingtonpost.com',
+        'theguardian.com', 'wsj.com', 'ft.com', 'economist.com', 'bloomberg.com',
+        'cnn.com', 'nbcnews.com', 'abcnews.go.com', 'cbsnews.com', 'npr.org',
+        'pbs.org', 'abc.net.au', 'smh.com.au', 'theage.com.au', 'scmp.com',
+      ];
+      
+      const hasReputableNews = newsArticles.some(article => 
+        reputableDomains.some(d => article.url.toLowerCase().includes(d))
+      );
+      
+      const hasRecentNews = newsArticles.some(article => {
+        const articleDate = new Date(article.date);
+        const daysOld = (Date.now() - articleDate.getTime()) / (1000 * 60 * 60 * 24);
+        return daysOld < 7;
+      });
+
+      if (hasReputableNews && hasRecentNews) {
+        evidenceQuality = 'strong';
+        verificationNeeded = false;
+      } else if (hasReputableNews || hasRecentNews) {
+        evidenceQuality = 'moderate';
+        verificationNeeded = true;
+      } else if (evidenceQuality === 'none') {
+        evidenceQuality = 'weak';
+        verificationNeeded = true;
+      }
+    }
+
+    return {
+      ...assessment,
+      supportingUrls: allSupportingUrls,
+      evidenceQuality,
+      verificationNeeded,
+      suggestedQueries,
+    };
+  });
+}

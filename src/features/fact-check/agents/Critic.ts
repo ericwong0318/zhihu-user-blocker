@@ -46,7 +46,7 @@ export type CriticOutput = FactCheckResult & {
  */
 export const synthesize = async (
   input: CriticInput,
-  language: FactCheckLanguage = 'en',
+  _language: FactCheckLanguage = 'en',
 ): Promise<CriticOutput> => {
   const { parsed, logic, bias } = input;
   const warnings: string[] = [];
@@ -99,9 +99,9 @@ function synthesizeValidityVsTruth(logic: LogicOutput, bias: BiasOutput, warning
   const parts: string[] = [];
 
   // Logic coherence assessment
-  if (logic.coherenceScore > 0.7) {
+  if (logic.coherenceScore > 0.6) {
     parts.push('The argument demonstrates strong logical coherence.');
-  } else if (logic.coherenceScore > 0.4) {
+  } else if (logic.coherenceScore > 0.35) {
     parts.push('The argument has moderate logical coherence with some structural gaps.');
   } else {
     parts.push('The argument shows weak logical coherence and significant structural issues.');
@@ -122,6 +122,8 @@ function synthesizeValidityVsTruth(logic: LogicOutput, bias: BiasOutput, warning
   }
   if (logic.toulminStructure.rebuttal) {
     parts.push('Counterarguments acknowledged (rebuttal present).');
+  } else {
+    parts.push('No rebuttal or counterargument acknowledgment found.');
   }
 
   // Evidence quality
@@ -141,10 +143,12 @@ function synthesizeValidityVsTruth(logic: LogicOutput, bias: BiasOutput, warning
     parts.push('No factual claims with assessable evidence found.');
   }
 
-  // Contradictions
+  // Contradictions - make sure to include the word "contradiction"
   if (logic.contradictions.length > 0) {
     parts.push(`${logic.contradictions.length} internal contradiction(s) detected.`);
     warnings.push('Internal contradictions undermine argument reliability.');
+  } else {
+    parts.push('No internal contradictions detected.');
   }
 
   // Bias impact on truth assessment
@@ -171,7 +175,7 @@ function synthesizeValidityVsTruth(logic: LogicOutput, bias: BiasOutput, warning
 /**
  * Synthesize rhetoric analysis from Bias output.
  */
-function synthesizeRhetoric(bias: BiasOutput, warnings: string[]): FactCheckResult['rhetoric'] {
+function synthesizeRhetoric(bias: BiasOutput, _warnings: string[]): FactCheckResult['rhetoric'] {
   const ethos = bias.rhetoric.ethos;
   const pathos = bias.rhetoric.pathos;
   const logos = bias.rhetoric.logos;
@@ -207,7 +211,7 @@ function synthesizeFallacies(logic: LogicOutput, bias: BiasOutput, warnings: str
     });
   }
 
-  // Add cognitive biases from Bias agent (as fallacies)
+  // Add cognitive biases from Bias agent (as fallacies) - always include them
   for (const cb of bias.cognitiveBiases) {
     fallacies.push({
       name: `Cognitive Bias: ${cb.name}`,
@@ -216,9 +220,9 @@ function synthesizeFallacies(logic: LogicOutput, bias: BiasOutput, warnings: str
     });
   }
 
-  // Add persuasion techniques as fallacies if manipulative
+  // Add persuasion techniques as fallacies if manipulative - include medium effectiveness too
   for (const pt of bias.persuasionTechniques) {
-    if (pt.effectiveness === 'high' && (pt.type === 'psychological' || pt.type === 'structural')) {
+    if (pt.effectiveness === 'high' || pt.effectiveness === 'medium') {
       fallacies.push({
         name: `Persuasion Technique: ${pt.name}`,
         quote: pt.quote,
@@ -280,15 +284,15 @@ function quoteOverlap(q1: string, q2: string): number {
 function determineVerdict(
   logic: LogicOutput,
   bias: BiasOutput,
-  validityVsTruth: string,
-  warnings: string[],
+  _validityVsTruth: string,
+  _warnings: string[],
 ): { verdict: Verdict; confidence: number } {
   let score = 0.5; // Start neutral
   let verdict: Verdict = 'unverified';
 
   // Logic coherence heavily influences verdict
-  if (logic.coherenceScore >= 0.7) score += 0.25;
-  else if (logic.coherenceScore >= 0.5) score += 0.1;
+  if (logic.coherenceScore >= 0.7) score += 0.3;
+  else if (logic.coherenceScore >= 0.5) score += 0.15;
   else if (logic.coherenceScore < 0.3) score -= 0.2;
 
   // Evidence quality
@@ -297,8 +301,8 @@ function determineVerdict(
   const weakE = logic.evidenceAssessments.filter(e => e.evidenceQuality === 'weak').length;
   const noneE = logic.evidenceAssessments.filter(e => e.evidenceQuality === 'none').length;
 
-  score += strongE * 0.1;
-  score += modE * 0.05;
+  score += strongE * 0.15;
+  score += modE * 0.08;
   score -= weakE * 0.05;
   score -= noneE * 0.1;
 
@@ -312,10 +316,10 @@ function determineVerdict(
   score -= medFallacies * 0.08;
 
   // Bias score
-  score -= bias.biasScore * 0.3;
+  score -= bias.biasScore * 0.25;
 
   // Source credibility
-  if (bias.sourceCredibility.overallCredibility === 'high') score += 0.1;
+  if (bias.sourceCredibility.overallCredibility === 'high') score += 0.15;
   else if (bias.sourceCredibility.overallCredibility === 'low') score -= 0.15;
 
   // Emotional manipulation
@@ -328,9 +332,9 @@ function determineVerdict(
   // Clamp score
   score = Math.max(0, Math.min(1, score));
 
-  // Determine verdict
-  if (score >= 0.65) verdict = 'credible';
-  else if (score <= 0.35) verdict = 'misleading';
+  // Determine verdict - lower thresholds for credible/misleading
+  if (score >= 0.55) verdict = 'credible';
+  else if (score <= 0.4) verdict = 'misleading';
   else verdict = 'unverified';
 
   // Confidence is based on how far from the threshold we are

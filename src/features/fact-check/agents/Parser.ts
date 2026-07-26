@@ -78,7 +78,7 @@ export type ParsingStats = {
 /**
  * URL regex pattern - matches HTTP/HTTPS URLs
  */
-const URL_REGEX = /https?:\/\/[^\s<>"{}|\\^`\[\]]+/g;
+const URL_REGEX = /https?:\/\/[^\s<>"{}|^`\]]+/g;
 
 /**
  * Clean trailing punctuation from URLs
@@ -116,11 +116,6 @@ const TABLE_REGEX = /^\|.+\|\n\|[-:| ]+\|\n(?:\|.+\|\n?)+/gm;
  * Markdown image regex
  */
 const IMAGE_REGEX = /!\[([^\]]*)\]\(([^)]+)\)/g;
-
-/**
- * Markdown link regex (non-image)
- */
-const LINK_REGEX = /(?<!!)\[([^\]]+)\]\(([^)]+)\)/g;
 
 /**
  * Chinese punctuation and characters for language detection
@@ -235,7 +230,7 @@ function cleanText(raw: string): string {
   // Normalize spaces (but preserve intentional indentation in code blocks)
   // We'll handle this more carefully by not normalizing inside code blocks
   const lines = text.split('\n');
-  const processedLines = lines.map((line, i) => {
+  const processedLines = lines.map((line, _i) => {
     // Don't trim lines that look like code (start with 4 spaces or tab)
     if (/^(\s{4}|\t)/.test(line)) {
       return line;
@@ -272,8 +267,8 @@ function extractUrls(text: string): ExtractedUrl[] {
     const beforeChar = text[start - 1] || '';
     const afterChar = text[end] || '';
     const isLikelyCitation =
-      /[\[\(]/.test(beforeChar) ||
-      /[\]\)]/.test(afterChar) ||
+      /[[(]/.test(beforeChar) ||
+      /[\])]]/.test(afterChar) ||
       context.includes('source') ||
       context.includes('reference') ||
       context.includes('citation') ||
@@ -506,8 +501,6 @@ function splitIntoSentences(text: string): string[] {
  * Classify the type of claim
  */
 function classifyClaim(sentence: string): ExtractedClaim['type'] {
-  const lower = sentence.toLowerCase();
-
   // Check for question patterns first
   if (QUESTION_PATTERNS.some(p => p.test(sentence))) {
     return 'question';

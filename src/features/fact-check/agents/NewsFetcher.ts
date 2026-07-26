@@ -226,7 +226,7 @@ export async function fetchRelevantNews(
   claims: ExtractedClaim[],
   config: NewsFetcherConfig,
   language: FactCheckLanguage = 'en',
-  signal?: AbortSignal
+  _signal?: AbortSignal
 ): Promise<NewsFetchResult> {
   const startTime = Date.now();
   const errors: string[] = [];

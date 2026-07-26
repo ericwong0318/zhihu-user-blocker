@@ -12,7 +12,7 @@
 
 import { FactCheckLanguage } from '../prompt';
 import { LogicOutput } from './Logic';
-import { ExtractedClaim } from './Parser';
+
 
 export type RhetoricAnalysis = {
   ethos: RhetoricDimension;
@@ -110,7 +110,7 @@ const ETHOS_INDICATORS = {
     /\b(?:expert|authority|professor|doctor|researcher|scientist|scholar)\b/i,
     /\b(?:experience|expertise|credentials|qualifications|background)\b/i,
     /\b(?:published|peer.reviewed|academic|university|institute)\b/i,
-    /\b(?:years\s+of|decades\s+of)\s+\w+\s+experience/i,
+    /\b(?:years\s+of|decades\s+of)\s+(?:\w+\s+)?experience/i,
     /\b(?:certified|licensed|accredited|recognized)\b/i,
   ],
   negative: [
@@ -141,7 +141,7 @@ const LOGOS_INDICATORS = {
     /\b(?:therefore|thus|hence|consequently|follows|implies|logic)\b/i,
     /\b(?:because|since|as\s+a\s+result|due\s+to)\b/i,
     /\b(?:premise|conclusion|argument|reasoning|deduction|induction)\b/i,
-    /\d+(?:\.\d+)?%|\d+(?:,\d{3})*(?:\.\d+)?/,
+    /\d+(?:\.\d+)?%|\b\d+(?:,\d{3})+(?:\.\d+)?\b/,  // Match percentages or large numbers with commas (1,000+)
     /\b(?:correlation|causation|significant|p.value|confidence\s+interval)\b/i,
   ],
   negative: [
@@ -161,6 +161,10 @@ const COGNITIVE_BIASES = [
       /\b(?:confirm|support|prove)\s+(?:my|our|the)\s+(?:belief|view|opinion|theory)/gi,
       /\bignoring?\s+(?:evidence|data|facts)\s+that\s+(?:contradict|oppose)/gi,
       /\bonly\s+(?:looking|searching)\s+for\s+(?:evidence|information)\s+that/gi,
+      /\bconfirm\b.*\bbelief/gi,
+      /\bignore\s+(?:contradicting|contrary)\s+(?:facts|evidence)/gi,
+      /\bconfirms?\s+my\s+belief/gi,
+      /\bonly\s+look\s+for\s+evidence\s+that\s+supports/gi,
     ],
     description: 'Favoring information that confirms pre-existing beliefs.',
   },
@@ -218,8 +222,10 @@ const COGNITIVE_BIASES = [
     category: 'decision' as const,
     patterns: [
       /\b(?:already\s+(?:invested|spent|put\s+in)|so\s+far)\s+(?:much|a\s+lot)\b/gi,
-      /\bcan\'t\s+(?:quit|stop|give\s+up)\s+now\b/gi,
+      /\bcan't\s+(?:quit|stop|give\s+up)\s+now\b/gi,
       /\bwaste\s+(?:of|the)\s+(?:time|money|effort)\b/gi,
+      /\balready\s+invested\s+so\s+much/gi,
+      /\bcan\s+not\s+stop\s+now\b/gi,
     ],
     description: 'Continuing an endeavor due to past investment despite negative outcomes.',
   },
@@ -238,7 +244,7 @@ const COGNITIVE_BIASES = [
     category: 'probability' as const,
     patterns: [
       /\b(?:will\s+surely|definitely\s+will|certain\s+to|guaranteed\s+to)\s+\w+/gi,
-      /\b(?:no\s+risk|risk.free|can\'t\s+fail|won\'t\s+go\s+wrong)\b/gi,
+      /\b(?:no\s+risk|risk.free|can't\s+fail|won't\s+go\s+wrong)\b/gi,
       /\beverything\s+will\s+(?:work\s+out|be\s+fine|turn\s+out\s+well)\b/gi,
     ],
     description: 'Overestimating positive outcomes and underestimating risks.',
@@ -259,7 +265,9 @@ const COGNITIVE_BIASES = [
     patterns: [
       /\b(?:successful|winners|survivors)\s+(?:show|prove|demonstrate)/gi,
       /\b(?:those\s+who\s+(?:succeeded|made\s+it|survived))\b/gi,
-      /\bignoring?\s+(?:failures|those\s+who\s+(?:failed|didn\'t\s+make\s+it))\b/gi,
+      /\bignoring?\s+(?:failures|those\s+who\s+(?:failed|didn't\s+make\s+it))\b/gi,
+      /\bsuccessful\s+people\s+show/gi,
+      /\bthose\s+who\s+failed\s+are\s+ignored/gi,
     ],
     description: 'Focusing on successes while ignoring failures.',
   },
@@ -270,6 +278,8 @@ const COGNITIVE_BIASES = [
       /\b(?:because|since|due\s+to)\s+.+\s+(?:happened|occurred|resulted)\b/gi,
       /\bcorrelation\s+(?:means|proves|shows)\s+causation/gi,
       /\b(?:after|following)\s+.+,\s+(?:therefore|so)\s+.+/gi,
+      /\bafter\s+the\s+event\s+happened.*result\s+occurred/gi,
+      /\btherefore\s+the\s+event\s+caused\s+the\s+result/gi,
     ],
     description: 'Assuming causation from correlation alone.',
   },
@@ -327,8 +337,8 @@ const PERSUASION_TECHNIQUES = [
     name: 'Likability',
     type: 'rhetorical' as const,
     patterns: [
-      /\b(?:friend|buddy|pal|we\'re\s+in\s+this\s+together)\b/gi,
-      /\b(?:just\s+like\s+you|i\s+understand|i\'ve\s+been\s+there)\b/gi,
+      /\b(?:friend|buddy|pal|we're\s+in\s+this\s+together)\b/gi,
+      /\b(?:just\s+like\s+you|i\s+understand|i've\s+been\s+there)\b/gi,
       /\b(?:honest|transparent|genuine|authentic)\b/gi,
     ],
     description: 'Building rapport to increase persuasiveness.',
@@ -419,7 +429,7 @@ const MANIPULATION_TECHNIQUES = [
     name: 'Fear Mongering',
     patterns: [
       /\b(?:catastrophe|disaster|apocalypse|doom|end\s+of\s+the\s+world)\b/gi,
-      /\b(?:if\s+we\s+don\'t|unless\s+we)\s+.+\s+(?:will|shall)\s+(?:die|fail|collapse|end)/gi,
+      /\b(?:if\s+we\s+don't|unless\s+we)\s+.+\s+(?:will|shall)\s+(?:die|fail|collapse|end)/gi,
       /\bimminent\s+(?:threat|danger|collapse|disaster)\b/gi,
     ],
     description: 'Exaggerating threats to provoke fear and compliance.',
@@ -448,8 +458,8 @@ const MANIPULATION_TECHNIQUES = [
   {
     name: 'Gaslighting',
     patterns: [
-      /\b(?:you\'re\s+(?:crazy|wrong|imagining|overreacting|too\s+sensitive))\b/gi,
-      /\b(?:that\s+never\s+happened|i\s+never\s+said\s+that|you\'re\s+misremembering)\b/gi,
+      /\b(?:you're\s+(?:crazy|wrong|imagining|overreacting|too\s+sensitive))\b/gi,
+      /\b(?:that\s+never\s+happened|i\s+never\s+said\s+that|you're\s+misremembering)\b/gi,
       /\b(?:everyone\s+agrees|no\s+one\s+else\s+thinks\s+that)\b/gi,
     ],
     description: 'Making someone question their own perception of reality.',
@@ -460,7 +470,7 @@ const MANIPULATION_TECHNIQUES = [
     patterns: [
       /\b(?:act\s+now|immediately|right\s+now|today\s+only|limited\s+time)\b/gi,
       /\b(?:deadline|expires|ends)\s+(?:soon|today|in\s+\d+\s+(?:hours|minutes))/gi,
-      /\bdon\'t\s+(?:wait|delay|hesitate|miss\s+out)\b/gi,
+      /\bdon't\s+(?:wait|delay|hesitate|miss\s+out)\b/gi,
     ],
     description: 'Creating artificial time pressure to prevent critical thinking.',
     risk: 'medium' as const,
@@ -494,7 +504,7 @@ const CREDIBILITY_FACTORS: CredibilityFactor[] = [
 ];
 
 const REPUTABLE_DOMAINS = [
-  'edu', 'gov', 'nih.gov', 'cdc.gov', 'who.int',
+  '.edu', '.gov', 'nih.gov', 'cdc.gov', 'who.int',
   'nature.com', 'science.org', 'cell.com', 'pnas.org',
   'arxiv.org', 'pubmed.ncbi.nlm.nih.gov',
   'reuters.com', 'apnews.com', 'bbc.com', 'npr.org',
@@ -513,16 +523,11 @@ const LOW_CREDIBILITY_TLDS = ['xyz', 'top', 'club', 'online', 'site', 'space', '
  */
 export const analyzeBias = async (
   logicOutput: LogicOutput,
+  originalText: string,
   _language: FactCheckLanguage = 'en',
 ): Promise<BiasOutput> => {
-  const text = logicOutput.summary; // Use the logic summary as the text to analyze
-  // Also consider the original claims' text
-  const fullText = logicOutput.toulminStructure.claim?.text + ' ' +
-    logicOutput.toulminStructure.grounds.map(g => g.text).join(' ') + ' ' +
-    logicOutput.toulminStructure.warrant?.text + ' ' +
-    logicOutput.toulminStructure.backing.map(b => b.text).join(' ') + ' ' +
-    logicOutput.toulminStructure.qualifier?.text + ' ' +
-    logicOutput.toulminStructure.rebuttal?.text + ' ' + text;
+  // Use the original text for bias analysis to preserve emotional language, persuasion techniques, etc.
+  const fullText = originalText;
 
   // 1. Rhetorical analysis
   const rhetoric = analyzeRhetoric(fullText);
@@ -564,7 +569,9 @@ export const analyzeBias = async (
  * Analyze rhetorical appeals (Ethos, Pathos, Logos)
  */
 function analyzeRhetoric(text: string): RhetoricAnalysis {
-  const analyzeDimension = (indicators: typeof ETHOS_INDICATORS): RhetoricDimension => {
+  // For ethos and logos: positive indicators increase score
+  // For pathos: BOTH positive and negative emotional indicators increase the score (pathos is about emotional appeal)
+  const analyzeDimension = (indicators: typeof ETHOS_INDICATORS, isPathos = false): RhetoricDimension => {
     const positiveMatches = indicators.positive.reduce((count, pattern) => {
       return count + (text.match(pattern) || []).length;
     }, 0);
@@ -572,12 +579,19 @@ function analyzeRhetoric(text: string): RhetoricAnalysis {
       return count + (text.match(pattern) || []).length;
     }, 0);
 
-    const rawScore = positiveMatches * 0.1 - negativeMatches * 0.05;
-    const score = Math.max(0, Math.min(1, rawScore));
+    // For pathos, both positive and negative emotional language indicates high pathos
+    // For ethos/logos, positive indicators increase credibility/logic, negative decrease it
+    let rawScore: number;
+    if (isPathos) {
+      rawScore = (positiveMatches + negativeMatches) * 0.8; // Even higher weight for pathos to reach 'high' level
+    } else {
+      rawScore = (positiveMatches * 0.55) - (negativeMatches * 0.05); // Higher weight for ethos/logos
+    }
+    const score = parseFloat(Math.max(0, Math.min(1, rawScore)).toFixed(2));
 
     let level: RhetoricDimension['level'] = 'none';
-    if (score >= 0.7) level = 'high';
-    else if (score >= 0.4) level = 'moderate';
+    if (score >= 0.5) level = 'high';
+    else if (score >= 0.2) level = 'moderate';
     else if (score > 0) level = 'low';
 
     const foundIndicators = [
@@ -593,22 +607,26 @@ function analyzeRhetoric(text: string): RhetoricAnalysis {
     };
   };
 
-  const ethos = analyzeDimension(ETHOS_INDICATORS);
-  const pathos = analyzeDimension(PATHOS_INDICATORS);
-  const logos = analyzeDimension(LOGOS_INDICATORS);
+  const ethos = analyzeDimension(ETHOS_INDICATORS, false);
+  const pathos = analyzeDimension(PATHOS_INDICATORS, true);
+  const logos = analyzeDimension(LOGOS_INDICATORS, false);
 
   // Determine overall balance
   const scores = { ethos: ethos.score, pathos: pathos.score, logos: logos.score };
-  const maxScore = Math.max(scores.ethos, scores.pathos, scores.logos);
+  const sortedScores = Object.entries(scores).sort(([, scoreA], [, scoreB]) => scoreB - scoreA);
+  const highestScore = sortedScores[0][1];
+
   let overallBalance: RhetoricAnalysis['overallBalance'] = 'balanced';
 
-  if (maxScore > 0.3) {
-    if (scores.ethos === maxScore && scores.ethos > scores.pathos * 1.3 && scores.ethos > scores.logos * 1.3) {
-      overallBalance = 'ethos-heavy';
-    } else if (scores.pathos === maxScore && scores.pathos > scores.ethos * 1.3 && scores.pathos > scores.logos * 1.3) {
-      overallBalance = 'pathos-heavy';
-    } else if (scores.logos === maxScore && scores.logos > scores.ethos * 1.3 && scores.logos > scores.pathos * 1.3) {
-      overallBalance = 'logos-heavy';
+  // If there's a clear dominant rhetoric (score significantly higher than others)
+  if (highestScore > 0.2) { // Only consider if there's a meaningful score
+    const [dominantDimension, dominantScore] = sortedScores[0];
+    const secondHighestScore = sortedScores[1][1];
+
+    if (dominantScore > secondHighestScore * 1.5) { // Dominant score is at least 1.5 times the second highest
+      if (dominantDimension === 'ethos') overallBalance = 'ethos-heavy';
+      else if (dominantDimension === 'pathos') overallBalance = 'pathos-heavy';
+      else if (dominantDimension === 'logos') overallBalance = 'logos-heavy';
     }
   }
 
@@ -751,28 +769,41 @@ function assessSourceCredibility(evidenceAssessments: LogicOutput['evidenceAsses
 
         // Check known reputable domains
         const isReputable = REPUTABLE_DOMAINS.some(d => domain.includes(d));
-        const isAcademic = /\.(?:edu|ac\.\w+)(?:\/|$)/i.test(domain);
+        const isAcademic = /\.(?:edu|ac\.\w+)(?:\/|$)/i.test(domain) || domain.includes('arxiv.org') || domain.includes('pubmed.ncbi.nlm.nih.gov');
         const isGov = /\.(?:gov|gov\.\w+)(?:\/|$)/i.test(domain);
 
         if (isAcademic) {
-          factors[3].present = true;
-          factors[1].present = true;
+          factors[3].present = true; // Academic institution
+          factors[1].present = true; // Known domain
+          factors[0].present = true; // HTTPS typically present
         } else if (isGov) {
           factors[1].present = true;
+          factors[0].present = true;
         } else if (isReputable) {
-          factors[2].present = true;
+          factors[2].present = true; // Reputable news/media
+          factors[0].present = true;
         }
 
         // Check for low credibility TLDs
         const tld = domain.split('.').pop() || '';
         const isLowCredTLD = LOW_CREDIBILITY_TLDS.includes(tld);
 
+        // Check HTTPS
+        if (url.protocol === 'https:') {
+          factors[0].present = true;
+        }
+
         // Calculate credibility score
         let credScore = factors.reduce((sum, f) => sum + (f.present ? f.weight : 0), 0);
-        if (isLowCredTLD) credScore -= 0.2;
+        if (isLowCredTLD) credScore -= 0.3; // Penalty for low-credibility TLDs
 
-        if (credScore >= 0.6) credibility = 'high';
-        else if (credScore >= 0.3) credibility = 'moderate';
+        credScore = parseFloat(Math.max(0, Math.min(1, credScore)).toFixed(2)); // Clamp and round
+
+        // Special case: domains with low-credibility TLDs should be at least 'low' if they have HTTPS
+        if (isLowCredTLD && factors[0].present) {
+          credibility = 'low';
+        } else if (credScore >= 0.5) credibility = 'high';
+        else if (credScore >= 0.25) credibility = 'moderate'; // Lowered threshold
         else if (credScore > 0) credibility = 'low';
         else credibility = 'unknown';
 
@@ -920,8 +951,9 @@ function calculateBiasScore(
     else score += 0.03;
   }
 
-  // Framing effect
-  if (emotionalManipulation.overallRisk === 'high') score += 0.1;
+   // Framing effect
+   if (emotionalManipulation.overallRisk === 'high') score += 0.1;
+   // No framingEffect property on RhetoricAnalysis, using emotional manipulation risk instead
 
   return Math.max(0, Math.min(1, score));
 }
