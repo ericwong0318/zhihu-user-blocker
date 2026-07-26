@@ -44,6 +44,7 @@ export type MarkdownElement = {
   rawMarkdown: string;
   lineStart: number;
   lineEnd: number;
+  metadata?: Record<string, string>;
 };
 
 export type ExtractedClaim = {
@@ -185,10 +186,8 @@ export const parse = (
   // 5. Extract resources (images, tables, etc.)
   const resources = extractResources(raw);
 
-  // 6. Detect language (use hintLang if provided and not 'en')
-  // Map 'zh' to 'zh-CN' for convenience
-  const normalizedLang = lang === 'zh' ? 'zh-CN' : lang;
-  const detectedLanguage = normalizedLang !== 'en' ? normalizedLang : detectLanguage(cleaned, normalizedLang);
+  // 6. Detect language (use hint if provided and not 'en')
+  const detectedLanguage = lang !== 'en' ? lang : detectLanguage(cleaned, lang);
 
   // 7. Compute stats
   const stats: ParsingStats = {
