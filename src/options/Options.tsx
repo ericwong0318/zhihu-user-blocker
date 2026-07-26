@@ -49,7 +49,6 @@ const PROVIDER_LABELS: Record<ProviderId, string> = {
   deepseek: 'DeepSeek',
   openrouter: 'OpenRouter',
   other: 'Other (OpenAI-compatible)',
-  newsapi: 'NewsAPI.ai (Event Registry - News Articles)',
 };
 
 const PROVIDER_OPTIONS: ProviderId[] = [
@@ -60,7 +59,6 @@ const PROVIDER_OPTIONS: ProviderId[] = [
   'deepseek',
   'openrouter',
   'other',
-  'newsapi',
 ];
 
 const defaultModelFor = (provider: ProviderId | ''): string => {

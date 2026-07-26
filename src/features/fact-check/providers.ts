@@ -34,8 +34,7 @@ export type ProviderId =
   | 'openai'
   | 'deepseek'
   | 'openrouter'
-  | 'other'
-  | 'newsapi';
+  | 'other';
 
 export type FactCheckConfig = {
   provider: ProviderId;
@@ -359,21 +358,6 @@ export const callProvider = async (
         });
         break;
       }
-      case 'newsapi': {
-        // NewsAPI.ai (Event Registry) is used for fetching real-time news articles
-        // as evidence, not for AI-powered fact-checking. This provider returns
-        // a special response indicating news search should be used.
-        return {
-          ok: true,
-          result: {
-            validityVsTruth: 'NewsAPI.ai provides real-time news articles for evidence. Use the NewsFetcher agent to search for relevant articles.',
-            rhetoric: { ethos: '', pathos: '', logos: '' },
-            fallacies: [],
-            verdict: 'unverified',
-          },
-          provider: 'newsapi',
-        };
-      }
       default:
         return { ok: false, error: 'Unknown provider.', attempts: [] };
     }
@@ -570,8 +554,6 @@ const defaultModel = (provider: ProviderId): string => {
       return 'deepseek-chat';
     case 'other':
       return 'gpt-4o-mini';
-    case 'newsapi':
-      return 'newsapi';
   }
 };
 
