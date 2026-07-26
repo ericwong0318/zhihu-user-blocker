@@ -1,4 +1,4 @@
-export { parse, type ParsedInput } from './Parser';
-export { runLogic } from './Logic';
-export { analyzeBias } from './Bias';
-export { synthesize } from './Critic';
+export { parse, type ParsedInput, type ExtractedUrl, type MarkdownElement, type ExtractedClaim, type ExtractedResource, type ParsingStats, getParsingSummary } from './Parser';
+export { runLogic, type LogicOutput, type ToulminStructure, type LogicalFallacy, type EvidenceAssessment, type Contradiction, getLogicSummary } from './Logic';
+export { analyzeBias, type BiasOutput, type RhetoricAnalysis, type RhetoricDimension, type CognitiveBias, type PersuasionTechnique, type FramingAnalysis, type Frame, type SourceCredibility, type SourceAssessment, type CredibilityFactor, type EmotionalManipulation, type ManipulationTechnique, getBiasSummary } from './Bias';
+export { synthesize, type CriticInput, type CriticOutput, getCriticSummary } from './Critic';

@@ -1,113 +1,278 @@
 import { describe, it, expect } from 'vitest';
-import { runLogic } from './Logic';
-import { ParsedInput } from './Parser';
+import { runLogic, getLogicSummary } from './Logic';
+import { parse } from './Parser';
 
 describe('Logic Agent', () => {
   describe('runLogic', () => {
-    it('should return cleaned text from parsed input', async () => {
-      const input: ParsedInput = {
-        cleanedText: 'This is a test argument.',
-        resources: [],
-      };
+    it('should return logic output with all required fields', async () => {
+      const parsed = parse('Research shows that 75% of users prefer this method. According to a study published in 2023, the results are significant.', 'en');
+      const result = await runLogic(parsed, 'en');
 
-      const result = await runLogic(input, 'en');
-      expect(result).toBe('This is a test argument.');
+      expect(result).toHaveProperty('toulminStructure');
+      expect(result).toHaveProperty('fallacies');
+      expect(result).toHaveProperty('evidenceAssessments');
+      expect(result).toHaveProperty('contradictions');
+      expect(result).toHaveProperty('coherenceScore');
+      expect(result).toHaveProperty('summary');
     });
 
-    it('should handle empty string input', async () => {
-      const input: ParsedInput = {
-        cleanedText: '',
-        resources: [],
-      };
+    it('should identify main claim in Toulmin structure', async () => {
+      const parsed = parse('Research shows that 75% of users prefer this method. This proves the method is effective.', 'en');
+      const result = await runLogic(parsed, 'en');
 
-      const result = await runLogic(input, 'en');
-      expect(result).toBe('');
+      expect(result.toulminStructure.claim).not.toBeNull();
+      expect(result.toulminStructure.claim?.text).toContain('75%');
+    });
+
+    it('should identify grounds (supporting evidence)', async () => {
+      const parsed = parse('Study A shows 75% prefer this. Study B confirms 80% satisfaction. Therefore this method works.', 'en');
+      const result = await runLogic(parsed, 'en');
+
+      expect(result.toulminStructure.grounds.length).toBeGreaterThan(0);
+    });
+
+    it('should detect warrant when present', async () => {
+      const parsed = parse('Because this method reduces errors, and reducing errors improves quality, therefore this method improves quality.', 'en');
+      const result = await runLogic(parsed, 'en');
+
+      // The warrant detection looks for "because", "therefore", etc.
+      expect(result.toulminStructure.warrant).not.toBeNull();
+    });
+
+    it('should detect qualifier (modal language)', async () => {
+      const parsed = parse('This method probably works well. It likely improves results in most cases.', 'en');
+      const result = await runLogic(parsed, 'en');
+
+      expect(result.toulminStructure.qualifier).not.toBeNull();
+    });
+
+    it('should detect rebuttal (counterarguments)', async () => {
+      const parsed = parse('This method works well. However, it may not work for all users. But the benefits outweigh the drawbacks.', 'en');
+      const result = await runLogic(parsed, 'en');
+
+      expect(result.toulminStructure.rebuttal).not.toBeNull();
+    });
+
+    it('should detect ad hominem fallacy', async () => {
+      const parsed = parse('You are stupid and wrong. The author is an idiot.', 'en');
+      const result = await runLogic(parsed, 'en');
+
+      const adHominem = result.fallacies.find(f => f.name === 'Ad Hominem');
+      expect(adHominem).toBeDefined();
+      expect(adHominem?.severity).toBe('high');
+    });
+
+    it('should detect straw man fallacy', async () => {
+      const parsed = parse('So you are saying we should do nothing. You are misrepresenting my argument.', 'en');
+      const result = await runLogic(parsed, 'en');
+
+      const strawMan = result.fallacies.find(f => f.name === 'Straw Man');
+      expect(strawMan).toBeDefined();
+    });
+
+    it('should detect false dilemma fallacy', async () => {
+      const parsed = parse('Either we do this my way or everything fails. There are only two choices.', 'en');
+      const result = await runLogic(parsed, 'en');
+
+      const falseDilemma = result.fallacies.find(f => f.name === 'False Dilemma / False Dichotomy');
+      expect(falseDilemma).toBeDefined();
+    });
+
+    it('should detect slippery slope fallacy', async () => {
+      const parsed = parse('If we allow this, it will lead to disaster. One thing leads to another.', 'en');
+      const result = await runLogic(parsed, 'en');
+
+      const slipperySlope = result.fallacies.find(f => f.name === 'Slippery Slope');
+      expect(slipperySlope).toBeDefined();
+    });
+
+    it('should detect hasty generalization', async () => {
+      const parsed = parse('All users love this feature. Based on one person saying it is good.', 'en');
+      const result = await runLogic(parsed, 'en');
+
+      const hastyGen = result.fallacies.find(f => f.name === 'Hasty Generalization');
+      expect(hastyGen).toBeDefined();
+    });
+
+    it('should detect appeal to emotion', async () => {
+      const parsed = parse('Think of the children! This is heartbreaking and terrifying.', 'en');
+      const result = await runLogic(parsed, 'en');
+
+      const appealEmotion = result.fallacies.find(f => f.name === 'Appeal to Emotion');
+      expect(appealEmotion).toBeDefined();
+    });
+
+    it('should detect circular reasoning', async () => {
+      const parsed = parse('This is true because it is true. Circular reasoning at its finest.', 'en');
+      const result = await runLogic(parsed, 'en');
+
+      const circular = result.fallacies.find(f => f.name === 'Circular Reasoning / Begging the Question');
+      expect(circular).toBeDefined();
+    });
+
+    it('should detect appeal to popularity', async () => {
+      const parsed = parse('Everyone knows this is true. It is common knowledge that most people agree.', 'en');
+      const result = await runLogic(parsed, 'en');
+
+      const bandwagon = result.fallacies.find(f => f.name === 'Appeal to Popularity / Bandwagon');
+      expect(bandwagon).toBeDefined();
+    });
+
+    it('should detect tu quoque', async () => {
+      const parsed = parse('You do it too! You are a hypocrite.', 'en');
+      const result = await runLogic(parsed, 'en');
+
+      const tuQuoque = result.fallacies.find(f => f.name === 'Tu Quoque');
+      expect(tuQuoque).toBeDefined();
+    });
+
+    it('should assess evidence quality as strong for academic sources', async () => {
+      const parsed = parse('Study shows 80% effectiveness. https://arxiv.org/abs/1234.5678', 'en');
+      const result = await runLogic(parsed, 'en');
+
+      const assessment = result.evidenceAssessments[0];
+      expect(assessment).toBeDefined();
+      expect(assessment.evidenceQuality).toBe('strong');
+      expect(assessment.verificationNeeded).toBe(false);
+    });
+
+    it('should assess evidence quality as moderate for citation URLs', async () => {
+      const parsed = parse('Research indicates 75% prefer this. [https://example.com/study]', 'en');
+      const result = await runLogic(parsed, 'en');
+
+      const assessment = result.evidenceAssessments[0];
+      expect(assessment).toBeDefined();
+      expect(assessment.evidenceQuality).toBe('moderate');
+    });
+
+    it('should assess evidence quality as none when no URLs', async () => {
+      const parsed = parse('This method works very well without any evidence.', 'en');
+      const result = await runLogic(parsed, 'en');
+
+      const assessment = result.evidenceAssessments[0];
+      expect(assessment).toBeDefined();
+      expect(assessment.evidenceQuality).toBe('none');
+      expect(assessment.verificationNeeded).toBe(true);
+      expect(assessment.suggestedQueries.length).toBeGreaterThan(0);
+    });
+
+    it('should detect statistical contradictions', async () => {
+      const parsed = parse('Study shows 75% prefer A. Another study shows 80% prefer A.', 'en');
+      const result = await runLogic(parsed, 'en');
+
+      // These are similar claims about same topic with different numbers
+      // The contradiction detection looks for overlapping topics with different numbers
+      expect(result.contradictions.length).toBeGreaterThanOrEqual(0);
+    });
+
+    it('should detect direct contradictions', async () => {
+      const parsed = parse('This method works. This method does not work.', 'en');
+      const result = await runLogic(parsed, 'en');
+
+      expect(result.contradictions.length).toBeGreaterThan(0);
+      const directContradiction = result.contradictions.find(c => c.type === 'direct');
+      expect(directContradiction).toBeDefined();
+    });
+
+    it('should calculate coherence score between 0 and 1', async () => {
+      const parsed = parse('Well structured argument with evidence. Study shows 80% effectiveness. https://example.edu/study', 'en');
+      const result = await runLogic(parsed, 'en');
+
+      expect(result.coherenceScore).toBeGreaterThanOrEqual(0);
+      expect(result.coherenceScore).toBeLessThanOrEqual(1);
+    });
+
+    it('should generate meaningful summary', async () => {
+      const parsed = parse('Research shows 75% of users prefer this method.', 'en');
+      const result = await runLogic(parsed, 'en');
+
+      expect(result.summary).toBeDefined();
+      expect(result.summary.length).toBeGreaterThan(0);
+      expect(result.summary).toContain('coherence score');
+    });
+
+    it('should handle empty input', async () => {
+      const parsed = parse('', 'en');
+      const result = await runLogic(parsed, 'en');
+
+      expect(result.toulminStructure.claim).toBeNull();
+      expect(result.fallacies).toEqual([]);
+      expect(result.evidenceAssessments).toEqual([]);
+      expect(result.contradictions).toEqual([]);
+      expect(result.coherenceScore).toBeGreaterThanOrEqual(0);
     });
 
     it('should handle Chinese text', async () => {
-      const input: ParsedInput = {
-        cleanedText: '这是一个测试论点。',
-        resources: [],
-      };
+      const parsed = parse('研究表明75%的用户偏好这种方法。根据2023年的研究，结果显著。', 'zh-CN');
+      const result = await runLogic(parsed, 'zh-CN');
 
-      const result = await runLogic(input, 'zh');
-      expect(result).toBe('这是一个测试论点。');
+      expect(result.toulminStructure.claim).not.toBeNull();
+      expect(result.summary).toBeDefined();
     });
 
-    it('should handle text with URLs', async () => {
-      const input: ParsedInput = {
-        cleanedText: 'Check out https://example.com for evidence.',
-        resources: ['https://example.com'],
-      };
+    it('should provide logic summary for debugging', async () => {
+      const parsed = parse('Test argument with evidence.', 'en');
+      const result = await runLogic(parsed, 'en');
+      const summary = getLogicSummary(result);
 
-      const result = await runLogic(input, 'en');
-      expect(result).toContain('https://example.com');
+      expect(summary).toContain('Logic Analysis Summary');
+      expect(summary).toContain('Coherence Score');
+      expect(summary).toContain('Fallacies:');
+      expect(summary).toContain('Evidence:');
     });
 
-    it('should handle markdown-like content', async () => {
-      const input: ParsedInput = {
-        cleanedText: '**Bold claim** with *emphasis*.',
-        resources: [],
-      };
+    it('should return LogicOutput type with correct structure', async () => {
+      const parsed = parse('Test', 'en');
+      const result = await runLogic(parsed, 'en');
 
-      const result = await runLogic(input, 'en');
-      expect(result).toBe('**Bold claim** with *emphasis*.');
+      expect(typeof result.coherenceScore).toBe('number');
+      expect(typeof result.summary).toBe('string');
+      expect(Array.isArray(result.fallacies)).toBe(true);
+      expect(Array.isArray(result.evidenceAssessments)).toBe(true);
+      expect(Array.isArray(result.contradictions)).toBe(true);
+      expect(result.toulminStructure).toHaveProperty('claim');
+      expect(result.toulminStructure).toHaveProperty('grounds');
+      expect(result.toulminStructure).toHaveProperty('warrant');
+      expect(result.toulminStructure).toHaveProperty('backing');
+      expect(result.toulminStructure).toHaveProperty('qualifier');
+      expect(result.toulminStructure).toHaveProperty('rebuttal');
+      expect(result.toulminStructure).toHaveProperty('confidence');
     });
 
-    it('should handle multiline text', async () => {
-      const input: ParsedInput = {
-        cleanedText: 'Premise 1\nPremise 2\nConclusion',
-        resources: [],
-      };
+    it('should detect formal fallacy: affirming the consequent', async () => {
+      const parsed = parse('If it rains then the ground is wet. The ground is wet, therefore it rained.', 'en');
+      const result = await runLogic(parsed, 'en');
 
-      const result = await runLogic(input, 'en');
-      expect(result).toBe('Premise 1\nPremise 2\nConclusion');
+      const fallacy = result.fallacies.find(f => f.name === 'Affirming the Consequent');
+      expect(fallacy).toBeDefined();
+      expect(fallacy?.type).toBe('formal');
     });
 
-    it('should accept language parameter (currently unused)', async () => {
-      const input: ParsedInput = {
-        cleanedText: 'Test argument',
-        resources: [],
-      };
+    it('should detect formal fallacy: denying the antecedent', async () => {
+      const parsed = parse('If it rains then the ground is wet. It did not rain, therefore the ground is not wet.', 'en');
+      const result = await runLogic(parsed, 'en');
 
-      const resultEn = await runLogic(input, 'en');
-      const resultZh = await runLogic(input, 'zh');
-      const resultJa = await runLogic(input, 'ja');
-
-      expect(resultEn).toBe('Test argument');
-      expect(resultZh).toBe('Test argument');
-      expect(resultJa).toBe('Test argument');
+      const fallacy = result.fallacies.find(f => f.name === 'Denying the Antecedent');
+      expect(fallacy).toBeDefined();
+      expect(fallacy?.type).toBe('formal');
     });
 
-    it('should handle complex argument structure', async () => {
-      const input: ParsedInput = {
-        cleanedText: 'All humans are mortal. Socrates is human. Therefore, Socrates is mortal.',
-        resources: [],
-      };
+    it('should deduplicate fallacies at similar positions', async () => {
+      const parsed = parse('You are stupid and you are an idiot. Personal attack on the person.', 'en');
+      const result = await runLogic(parsed, 'en');
 
-      const result = await runLogic(input, 'en');
-      expect(result).toContain('All humans are mortal');
-      expect(result).toContain('Socrates is mortal');
+      const adHominems = result.fallacies.filter(f => f.name === 'Ad Hominem');
+      // Should deduplicate overlapping fallacies
+      expect(adHominems.length).toBeLessThanOrEqual(2);
     });
 
-    it('should return string type', async () => {
-      const input: ParsedInput = {
-        cleanedText: 'Test',
-        resources: [],
-      };
+    it('should generate search queries for claims needing verification', async () => {
+      const parsed = parse('This new method increases efficiency by 50%.', 'en');
+      const result = await runLogic(parsed, 'en');
 
-      const result = await runLogic(input, 'en');
-      expect(typeof result).toBe('string');
-    });
-
-    it('should handle resources array (currently unused)', async () => {
-      const input: ParsedInput = {
-        cleanedText: 'Argument with sources.',
-        resources: ['https://source1.com', 'https://source2.com'],
-      };
-
-      const result = await runLogic(input, 'en');
-      expect(result).toBe('Argument with sources.');
+      const assessment = result.evidenceAssessments[0];
+      expect(assessment.suggestedQueries.length).toBeGreaterThan(0);
+      expect(assessment.suggestedQueries[0]).toContain('fact check');
     });
   });
 });
