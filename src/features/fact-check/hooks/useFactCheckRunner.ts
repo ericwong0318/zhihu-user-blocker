@@ -1,4 +1,5 @@
 import { useCallback } from 'react';
+import type { FactCheckResult } from '../prompt';
 
 export type StageReporter = (stage: string, isRetry?: boolean) => void;
 
@@ -45,7 +46,8 @@ export const runFactCheck = (
         return;
       }
       if (typeof msg === 'object' && msg && 'result' in msg) {
-        finish(msg);
+        const resultMsg = msg as { result: FactCheckResult; provider?: string | null };
+        finish({ ...resultMsg.result, provider: resultMsg.provider ?? null });
         return;
       }
       finish(msg);
