@@ -122,7 +122,6 @@ describe('background message handler', () => {
         question: string | undefined,
         configs: FactCheckConfig[],
         onStage: (stage: string, isRetry: boolean) => void,
-        timeoutMs: number,
         signal?: AbortSignal,
       ) => {
         captured.signal = signal;
